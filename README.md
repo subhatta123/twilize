@@ -7,7 +7,7 @@
 
 **cwtwb** is a Model Context Protocol (MCP) server that generates Tableau Desktop workbook files (`.twb`) from AI-driven tool calls. It provides atomic operations for building visualizations step by step:
 
-1. Load a TWB template with data connections
+1. **Zero-Config Start**: Works out-of-the-box with a built-in clean template and a minimal `Sample - Superstore` dataset, or load your own TWB template.
 2. Add calculated fields
 3. Create worksheets with various chart types
 4. Assemble dashboards with flexible layouts

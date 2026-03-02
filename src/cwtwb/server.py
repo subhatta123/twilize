@@ -69,7 +69,7 @@ def read_tableau_functions() -> str:
 
 
 @server.tool()
-def create_workbook(template_path: str, workbook_name: str = "") -> str:
+def create_workbook(template_path: str = "", workbook_name: str = "") -> str:
     """Create a new workbook from a TWB template file.
 
     This must be called first before using any other tools.
@@ -77,7 +77,7 @@ def create_workbook(template_path: str, workbook_name: str = "") -> str:
     and clears existing worksheets.
 
     Args:
-        template_path: Absolute path to the TWB template file.
+        template_path: Optional absolute path to a TWB template file to use. If omitted, an empty default template with a simple Superstore dataset is used.
         workbook_name: Optional display name for the workbook.
 
     Returns:

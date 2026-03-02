@@ -29,7 +29,15 @@ class TWBEditor:
     """lxml-based TWB XML editor."""
 
     def __init__(self, template_path: str | Path):
-        template_path = Path(template_path)
+        if not template_path:
+            # Use internal default template
+            from .server import REFERENCES_DIR
+            template_path = REFERENCES_DIR / "empty_template.twb"
+            self._is_default_template = True
+        else:
+            template_path = Path(template_path)
+            self._is_default_template = False
+
         if not template_path.exists():
             raise FileNotFoundError(f"Template file not found: {template_path}")
 
@@ -52,6 +60,16 @@ class TWBEditor:
 
         # Clear out default worksheets/dashboards to avoid ghost fields
         self.clear_worksheets()
+
+        # If using the default template, dynamically fix the excel connection filename
+        if getattr(self, "_is_default_template", False):
+            from .server import REFERENCES_DIR
+            default_excel = REFERENCES_DIR / "Sample - Superstore - simple.xls"
+            # Find the excel-direct connection and update its filename
+            excel_conn = self._datasource.find(".//connection[@class='excel-direct']")
+            if excel_conn is not None:
+                # lxml paths should use forward slashes
+                excel_conn.set("filename", str(default_excel.absolute()).replace("\\", "/"))
 
     # ================================================================
     # Initialization
@@ -401,11 +419,24 @@ class TWBEditor:
             for t in list(thumbnails):
                 thumbnails.remove(t)
 
+        # Ensure at least one blank worksheet exists (so TWB can be opened directly)
+        self.add_worksheet("Sheet 1")
+
     def add_worksheet(self, worksheet_name: str) -> str:
         """Add a new blank worksheet."""
         worksheets = self.root.find("worksheets")
         if worksheets is None:
-            worksheets = etree.SubElement(self.root, "worksheets")
+            insert_before = None
+            for tag in ("dashboards", "windows", "thumbnails", "external"):
+                el = self.root.find(tag)
+                if el is not None:
+                    insert_before = el
+                    break
+            if insert_before is not None:
+                worksheets = etree.Element("worksheets")
+                insert_before.addprevious(worksheets)
+            else:
+                worksheets = etree.SubElement(self.root, "worksheets")
 
         ds_name = self._datasource.get("name", "")
         ds_caption = self._datasource.get("caption", "")
@@ -909,14 +940,23 @@ class TWBEditor:
         # Get or create <dashboards>
         dashboards = self.root.find("dashboards")
         if dashboards is None:
-            # Insert after worksheets
-            ws_el = self.root.find("worksheets")
-            if ws_el is not None:
-                idx = list(self.root).index(ws_el) + 1
+            insert_before = None
+            for tag in ("windows", "thumbnails", "external"):
+                el = self.root.find(tag)
+                if el is not None:
+                    insert_before = el
+                    break
+            if insert_before is not None:
                 dashboards = etree.Element("dashboards")
-                self.root.insert(idx, dashboards)
+                insert_before.addprevious(dashboards)
             else:
-                dashboards = etree.SubElement(self.root, "dashboards")
+                ws_el = self.root.find("worksheets")
+                if ws_el is not None:
+                    idx = list(self.root).index(ws_el) + 1
+                    dashboards = etree.Element("dashboards")
+                    self.root.insert(idx, dashboards)
+                else:
+                    dashboards = etree.SubElement(self.root, "dashboards")
 
         # Create dashboard element
         # Structure: style -> size -> zones -> simple-id

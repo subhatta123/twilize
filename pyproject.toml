@@ -1,6 +1,6 @@
 [project]
 name = "cwtwb"
-version = "0.4.0"
+version = "0.5.0"
 description = "Tableau Workbook (.twb) Generation MCP Server"
 readme = "README.md"
 license = {text = "MIT"}
@@ -27,7 +27,7 @@ cwtwb = "cwtwb.server:main"
 
 [project.urls]
 Homepage = "https://github.com/imgwho/cwtwb"
-Changelog = "https://github.com/imgwho/cwtwb/blob/main/CHANGELOG.md"
+Changelog = "https://github.com/imgwho/cwtwb/blob/master/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]

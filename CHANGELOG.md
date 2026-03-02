@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-03-02
+
+### Added
+- **Zero-Config Blank Templates**: The SDK and MCP server now come with a built-in `empty_template.twb` and a minimal `Sample - Superstore - simple.xls` dataset.
+- **Dynamic Connection Resolution**: When initializing `TWBEditor` without a `template_path`, it automatically resolves and rewrites the internal Excel connection to the runtime absolute path of the bundled sample dataset.
+- **Always-Valid Workbooks**: `clear_worksheets()` now guarantees the creation of at least one default worksheet (`Sheet 1`), ensuring generated TWB files are completely valid and openable in Tableau Desktop immediately upon creation.
+
+### Changed
+- **MCP Tool `create_workbook`**: The `template_path` parameter is now optional. When omitted, it boots up the zero-config blank template.
+- **XML Element Ordering Fix**: `add_worksheet` and `add_dashboard` now strictly enforce the Tableau XSD schema by smartly inserting XML nodes *before* `<windows>`, `<thumbnails>`, and `<external>` tags instead of appending them at the end.
+
 ## [0.4.0] - 2026-02-28
 
 ### Fixed
