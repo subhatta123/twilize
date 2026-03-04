@@ -1077,7 +1077,15 @@ class TWBEditor:
                 continue
             
             filter_el = etree.Element("filter")
-            filter_type = f.get("type", "categorical")
+            
+            # Auto-detect filter type if not explicitly provided
+            filter_type = f.get("type")
+            if not filter_type:
+                # Based on the column instance type (qualitative vs quantitative)
+                if ci.ci_type == "quantitative" or ci.instance_name.endswith(":qk]"):
+                    filter_type = "quantitative"
+                else:
+                    filter_type = "categorical"
             
             USER_NS = "{http://www.tableausoftware.com/xml/user}"
             
@@ -1092,6 +1100,9 @@ class TWBEditor:
                 if "max" in f:
                     max_el = etree.SubElement(filter_el, "max")
                     max_el.text = f["max"]
+                    
+                # If neither min nor max provided for quantitative, provide a placeholder or skip min/max 
+                # to represent an open/unbound range filter.
             else:
                 filter_el.set("class", "categorical")
                 filter_el.set("column", self.field_registry.resolve_full_reference(ci.instance_name))
@@ -1114,6 +1125,14 @@ class TWBEditor:
                         member_el.set("function", "member")
                         member_el.set("level", ci.instance_name)
                         member_el.set("member", f'"{v}"')
+                else:
+                    # Provide an empty (All values) filter with valid ui markers
+                    gf = etree.SubElement(filter_el, "groupfilter")
+                    gf.set("function", "level-members")
+                    gf.set("level", ci.instance_name)
+                    gf.set(f"{USER_NS}ui-domain", "database")
+                    gf.set(f"{USER_NS}ui-enumeration", "inclusive")
+                    gf.set(f"{USER_NS}ui-marker", "enumerate")
             
             # Find insertion point (must be before sort, perspectives, slices, aggregation)
             insert_before = None
