@@ -1,0 +1,194 @@
+{
+    "type": "container",
+    "direction": "horizontal",
+    "children": [
+        {
+            "type": "container",
+            "direction": "vertical",
+            "fixed_size": 320,
+            "children": [
+                {
+                    "type": "text",
+                    "text": "COMPLAINTS INSIGHTS",
+                    "font_size": "18",
+                    "font_color": "#e63946",
+                    "bold": true,
+                    "fixed_size": 40
+                },
+                {
+                    "type": "text",
+                    "text": "Mapping consumer concerns and\ncompany responses across\nproducts and states in 2022",
+                    "font_size": "9",
+                    "font_color": "#888888",
+                    "fixed_size": 50
+                },
+                {
+                    "type": "worksheet",
+                    "name": "YTD Total Complaints",
+                    "fixed_size": 120
+                },
+                {
+                    "type": "container",
+                    "direction": "horizontal",
+                    "fixed_size": 60,
+                    "layout_strategy": "distribute-evenly",
+                    "children": [
+                        {
+                            "type": "worksheet",
+                            "name": "Timely Response Pct"
+                        },
+                        {
+                            "type": "worksheet",
+                            "name": "Complaints by Channel"
+                        }
+                    ]
+                },
+                {
+                    "type": "worksheet",
+                    "name": "Closed with Relief Pct",
+                    "fixed_size": 60
+                },
+                {
+                    "type": "worksheet",
+                    "name": "Complaints Vol vs Relief"
+                }
+            ]
+        },
+        {
+            "type": "container",
+            "direction": "vertical",
+            "weight": 1,
+            "children": [
+                {
+                    "type": "container",
+                    "direction": "horizontal",
+                    "fixed_size": 40,
+                    "children": [
+                        {
+                            "type": "text",
+                            "text": "十二月  vs  十一月    View of timely response vs monetary relief",
+                            "font_size": "11",
+                            "font_color": "#333333",
+                            "weight": 1
+                        }
+                    ]
+                },
+                {
+                    "type": "container",
+                    "direction": "horizontal",
+                    "fixed_size": 120,
+                    "layout_strategy": "distribute-evenly",
+                    "children": [
+                        {
+                            "type": "worksheet",
+                            "name": "Total Complaints KPI"
+                        },
+                        {
+                            "type": "worksheet",
+                            "name": "Timely Response KPI"
+                        },
+                        {
+                            "type": "worksheet",
+                            "name": "Closed with Monetary Relief KPI"
+                        }
+                    ]
+                },
+                {
+                    "type": "text",
+                    "text": "Complaints by Timely Response",
+                    "font_size": "14",
+                    "font_color": "#333333",
+                    "bold": true,
+                    "fixed_size": 30
+                },
+                {
+                    "type": "container",
+                    "direction": "horizontal",
+                    "weight": 1,
+                    "children": [
+                        {
+                            "type": "container",
+                            "direction": "vertical",
+                            "weight": 1,
+                            "style": {
+                                "background_color": "#f8f8f8"
+                            },
+                            "children": [
+                                {
+                                    "type": "text",
+                                    "text": "YES",
+                                    "font_size": "14",
+                                    "font_color": "#333333",
+                                    "bold": true,
+                                    "fixed_size": 30
+                                },
+                                {
+                                    "type": "container",
+                                    "direction": "horizontal",
+                                    "weight": 2,
+                                    "children": [
+                                        {
+                                            "type": "worksheet",
+                                            "name": "YES Count and Relief",
+                                            "weight": 1
+                                        },
+                                        {
+                                            "type": "worksheet",
+                                            "name": "YES Top 10 Issues",
+                                            "weight": 1
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "worksheet",
+                                    "name": "YES Complaint Details",
+                                    "weight": 1
+                                }
+                            ]
+                        },
+                        {
+                            "type": "container",
+                            "direction": "vertical",
+                            "weight": 1,
+                            "style": {
+                                "background_color": "#fce4ec"
+                            },
+                            "children": [
+                                {
+                                    "type": "text",
+                                    "text": "NO",
+                                    "font_size": "14",
+                                    "font_color": "#e63946",
+                                    "bold": true,
+                                    "fixed_size": 30
+                                },
+                                {
+                                    "type": "container",
+                                    "direction": "horizontal",
+                                    "weight": 2,
+                                    "children": [
+                                        {
+                                            "type": "worksheet",
+                                            "name": "NO Count and Relief",
+                                            "weight": 1
+                                        },
+                                        {
+                                            "type": "worksheet",
+                                            "name": "NO Top 10 Issues",
+                                            "weight": 1
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "worksheet",
+                                    "name": "NO Complaint Details",
+                                    "weight": 1
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

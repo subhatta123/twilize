@@ -1,0 +1,114 @@
+{
+    "type": "container",
+    "direction": "horizontal",
+    "children": [
+        {
+            "type": "container",
+            "direction": "vertical",
+            "fixed_size": 280,
+            "style": {
+                "background_color": "#2b3e50"
+            },
+            "children": [
+                {
+                    "type": "text",
+                    "text": "Estella Express",
+                    "font_size": "12",
+                    "font_color": "#ffffff",
+                    "bold": true,
+                    "fixed_size": 50
+                },
+                {
+                    "type": "worksheet",
+                    "name": "Avg Delivery Days"
+                },
+                {
+                    "type": "worksheet",
+                    "name": "Avg Fulfillment Days"
+                },
+                {
+                    "type": "worksheet",
+                    "name": "Orders KPI"
+                },
+                {
+                    "type": "worksheet",
+                    "name": "Customers KPI"
+                },
+                {
+                    "type": "worksheet",
+                    "name": "Returns KPI"
+                }
+            ]
+        },
+        {
+            "type": "container",
+            "direction": "vertical",
+            "weight": 1,
+            "children": [
+                {
+                    "type": "container",
+                    "direction": "horizontal",
+                    "fixed_size": 80,
+                    "children": [
+                        {
+                            "type": "text",
+                            "text": "Superstore Shipping Metrics\nOrders by Shipping Choice",
+                            "font_size": "22",
+                            "font_color": "#2b3e50",
+                            "bold": true,
+                            "weight": 2
+                        },
+                        {
+                            "type": "text",
+                            "text": "Metric: Orders | Sales\nCategory: Shipping | Location | Product",
+                            "font_size": "10",
+                            "font_color": "#555555",
+                            "weight": 1
+                        }
+                    ]
+                },
+                {
+                    "type": "container",
+                    "direction": "horizontal",
+                    "fixed_size": 120,
+                    "layout_strategy": "distribute-evenly",
+                    "children": [
+                        {
+                            "type": "worksheet",
+                            "name": "Breakdown Customers"
+                        },
+                        {
+                            "type": "worksheet",
+                            "name": "Breakdown Orders"
+                        },
+                        {
+                            "type": "worksheet",
+                            "name": "Breakdown Returns"
+                        }
+                    ]
+                },
+                {
+                    "type": "worksheet",
+                    "name": "Delivery Days Chart",
+                    "weight": 2
+                },
+                {
+                    "type": "container",
+                    "direction": "horizontal",
+                    "weight": 2,
+                    "layout_strategy": "distribute-evenly",
+                    "children": [
+                        {
+                            "type": "worksheet",
+                            "name": "Customer Distribution Map"
+                        },
+                        {
+                            "type": "worksheet",
+                            "name": "Order Distribution Chart"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
