@@ -190,6 +190,11 @@ class FlexNode:
                 except Exception:
                     zone.set("param", self.field)
             
+        # For filter/paramctrl zones, add default white background
+        if self.type in ("filter", "paramctrl"):
+            if "background-color" not in self.style and "background_color" not in self.style:
+                self.style["background-color"] = "#ffffff"
+
         # Apply standard or custom styles
         self._apply_style(zone, self.style)
         return zone

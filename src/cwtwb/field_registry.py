@@ -32,6 +32,7 @@ _DERIVATION_MAP: dict[str, str] = {
 # Derivation abbreviations (used for column-instance name generation)
 _DERIVATION_ABBR: dict[str, str] = {
     "None": "none",
+    "User": "usr",
     "Sum": "sum",
     "Avg": "avg",
     "Count": "cnt",
@@ -149,9 +150,13 @@ class FieldRegistry:
         # Look up the field
         fi = self._find_field(field_name)
 
+        # Calculated fields use derivation="User" (abbr: usr)
+        if fi.is_calculated and derivation == "None":
+            derivation = "User"
+
         # Determine type suffix
-        if derivation == "None":
-            ci_type = fi.field_type   # nominal / quantitative
+        if derivation in ("None", "User"):
+            ci_type = fi.field_type   # nominal / quantitative — preserve field's own type
         elif derivation in _TEMPORAL_DERIVATIONS:
             ci_type = "ordinal"
         else:

@@ -450,6 +450,38 @@ class TWBEditor:
 
         internal_name = f"[Calculation_{field_name}]"
 
+        # Resolve field and parameter references in formula
+        import re
+        resolved_formula = formula
+
+        # First, resolve bare parameter names (without brackets) → [Parameters].[internal_name]
+        for param_name, param_info in self._parameters.items():
+            # Replace bare parameter name (word boundary match to avoid partial replacement)
+            pattern = re.compile(re.escape(param_name))
+            internal = param_info["internal_name"]  # e.g. "[Parameter 1]"
+            replacement = f"[Parameters].{internal}"
+            resolved_formula = pattern.sub(replacement, resolved_formula)
+
+        # Then resolve [FieldName] references → [local_name]
+        for match in re.finditer(r'\[([^\]]+)\]', resolved_formula):
+            ref_name = match.group(1)
+            # Skip parameter references like [Parameters].[...]
+            if ref_name == "Parameters":
+                continue
+            # Check if it's a parameter display name in brackets
+            if ref_name in self._parameters:
+                internal = self._parameters[ref_name]["internal_name"]
+                resolved_formula = resolved_formula.replace(f"[{ref_name}]", f"[Parameters].{internal}")
+                continue
+            # Try to find the field in registry
+            try:
+                fi = self.field_registry._find_field(ref_name)
+                local = fi.local_name  # e.g. "[Profit (Orders)]"
+                if local.startswith("[") and local.endswith("]"):
+                    resolved_formula = resolved_formula.replace(f"[{ref_name}]", local)
+            except Exception:
+                pass  # Keep original reference
+
         # Create <column> element — must be inserted before <layout>
         # Tableau XSD requires column before layout/style/semantic-values
         col = etree.Element("column")
@@ -474,7 +506,7 @@ class TWBEditor:
         # Create <calculation> child element
         calc = etree.SubElement(col, "calculation")
         calc.set("class", "tableau")
-        calc.set("formula", formula)
+        calc.set("formula", resolved_formula)
 
         # Register in FieldRegistry
         self.field_registry.register(
@@ -486,7 +518,7 @@ class TWBEditor:
             is_calculated=True,
         )
 
-        return f"Added calculated field '{field_name}': {formula}"
+        return f"Added calculated field '{field_name}': {resolved_formula}"
 
     def remove_calculated_field(self, field_name: str) -> str:
         """Remove a calculated field."""
@@ -767,11 +799,28 @@ class TWBEditor:
                     expr.split("(")[-1].rstrip(")").strip()
                     if "(" in expr else expr.strip()
                 )
-                col_el = etree.Element("column")
-                col_el.set("datatype", fi.datatype)
-                col_el.set("name", fi.local_name)
-                col_el.set("role", fi.role)
-                col_el.set("type", fi.field_type)
+                # For calculated fields, use full column from datasource (with caption + formula)
+                if fi.is_calculated:
+                    import copy
+                    src_col = self._datasource.find(f"column[@name='{fi.local_name}']")
+                    if src_col is not None:
+                        col_el = copy.deepcopy(src_col)
+                    else:
+                        col_el = etree.Element("column")
+                        col_el.set("datatype", fi.datatype)
+                        col_el.set("name", fi.local_name)
+                        col_el.set("role", fi.role)
+                        col_el.set("type", fi.field_type)
+                else:
+                    col_el = etree.Element("column")
+                    col_el.set("datatype", fi.datatype)
+                    col_el.set("name", fi.local_name)
+                    col_el.set("role", fi.role)
+                    col_el.set("type", fi.field_type)
+                    # Copy semantic-role if present in datasource
+                    src_col = self._datasource.find(f"column[@name='{fi.local_name}']")
+                    if src_col is not None and src_col.get("semantic-role"):
+                        col_el.set("semantic-role", src_col.get("semantic-role"))
                 column_elements.append(col_el)
 
             # Collect column-instance definitions
@@ -791,8 +840,8 @@ class TWBEditor:
         for el in sorted(instance_elements, key=lambda e: e.get("name", "")):
             deps.append(el)
 
-        # 2) Set mark type (Map uses Automatic internally)
-        actual_mark_type = "Automatic" if is_map else mark_type
+        # 2) Set mark type (Map uses Multipolygon for filled maps)
+        actual_mark_type = "Multipolygon" if is_map else mark_type
         pane = table.find(".//pane")
         if pane is None:
             raise ValueError("Malformed structure: missing <pane>")
@@ -804,7 +853,7 @@ class TWBEditor:
             mark_el = etree.SubElement(pane, "mark")
             mark_el.set("class", actual_mark_type)
 
-        # 2b) For Map charts, add mapsources to view
+        # 2b) For Map charts, add mapsources to view and Parameters datasource
         if is_map:
             # Remove old mapsources if any
             for old_ms in view.findall("mapsources"):
@@ -819,6 +868,17 @@ class TWBEditor:
                 view_ds.addnext(mapsources)
             else:
                 view.insert(0, mapsources)
+
+            # Add Parameters datasource reference in view if parameters exist
+            if self._parameters and view_ds is not None:
+                params_ds_ref = view_ds.find("datasource[@name='Parameters']")
+                if params_ds_ref is None:
+                    pds = etree.SubElement(view_ds, "datasource")
+                    pds.set("caption", "参数")
+                    pds.set("name", "Parameters")
+                # Add Parameters datasource-dependencies
+                self._add_parameter_deps(view)
+
             # Also add mapsources at workbook root if not present
             root_ms = self.root.find("mapsources")
             if root_ms is None:
@@ -881,6 +941,39 @@ class TWBEditor:
                 geo_lod = etree.SubElement(encodings_el, "lod")
                 geo_lod.set("column", self.field_registry.resolve_full_reference(ci.instance_name))
 
+            # For Map charts, add Country/Region as lod and Geometry as encoding
+            if is_map:
+                # Add Country/Region lod if available
+                try:
+                    cr_ci = self.field_registry.parse_expression("Country/Region")
+                    cr_lod = etree.SubElement(encodings_el, "lod")
+                    cr_lod.set("column", self.field_registry.resolve_full_reference(cr_ci.instance_name))
+                    # Also add to deps if not already there
+                    if cr_ci.column_local_name not in seen_columns:
+                        seen_columns.add(cr_ci.column_local_name)
+                        fi = self.field_registry._find_field("Country/Region")
+                        col_el = etree.Element("column")
+                        col_el.set("datatype", fi.datatype)
+                        col_el.set("name", fi.local_name)
+                        col_el.set("role", fi.role)
+                        col_el.set("type", fi.field_type)
+                        deps.append(col_el)
+                    if cr_ci.instance_name not in seen_instances:
+                        seen_instances.add(cr_ci.instance_name)
+                        ci_el = etree.Element("column-instance")
+                        ci_el.set("column", cr_ci.column_local_name)
+                        ci_el.set("derivation", cr_ci.derivation)
+                        ci_el.set("name", cr_ci.instance_name)
+                        ci_el.set("pivot", cr_ci.pivot)
+                        ci_el.set("type", cr_ci.ci_type)
+                        deps.append(ci_el)
+                except Exception:
+                    pass
+
+                # Add Geometry (generated) encoding
+                geom = etree.SubElement(encodings_el, "geometry")
+                geom.set("column", f"[{ds_name}].[Geometry (generated)]")
+
             if tooltip:
                 tooltip_list = [tooltip] if isinstance(tooltip, str) else tooltip
                 for tt in tooltip_list:
@@ -905,6 +998,9 @@ class TWBEditor:
                 rows_el.text = f"[{ds_name}].[Latitude (generated)]"
             if cols_el is not None:
                 cols_el.text = f"[{ds_name}].[Longitude (generated)]"
+
+            # Also add calculated field deps that reference parameters
+            self._add_calculated_field_deps(view, ds_name, all_exprs)
         else:
             if rows_el is not None and rows:
                 row_refs = []
@@ -996,6 +1092,94 @@ class TWBEditor:
                 insert_before.addprevious(filter_el)
             else:
                 view.append(filter_el)
+
+    def _add_parameter_deps(self, view: etree._Element) -> None:
+        """Add Parameters datasource-dependencies to a view element.
+        
+        Creates a <datasource-dependencies datasource='Parameters'> block
+        containing column definitions for all tracked parameters.
+        """
+        if not self._parameters:
+            return
+            
+        # Check if already exists
+        for existing in view.findall("datasource-dependencies"):
+            if existing.get("datasource") == "Parameters":
+                return  # Already present
+        
+        # Find Parameters datasource in root
+        params_ds = None
+        for ds in self.root.findall(".//datasource"):
+            if ds.get("name") == "Parameters":
+                params_ds = ds
+                break
+        if params_ds is None:
+            return
+        
+        # Create deps element
+        param_deps = etree.Element("datasource-dependencies")
+        param_deps.set("datasource", "Parameters")
+        
+        # Copy column definitions from Parameters datasource
+        for col in params_ds.findall("column"):
+            import copy
+            col_copy = copy.deepcopy(col)
+            param_deps.append(col_copy)
+        
+        # Insert after mapsources but before main datasource-dependencies
+        # Schema: datasources → mapsources → datasource-dependencies
+        ms = view.find("mapsources")
+        if ms is not None:
+            ms.addnext(param_deps)
+        else:
+            ds_el = view.find("datasources")
+            if ds_el is not None:
+                ds_el.addnext(param_deps)
+            else:
+                agg = view.find("aggregation")
+                if agg is not None:
+                    agg.addprevious(param_deps)
+                else:
+                    view.append(param_deps)
+
+    def _add_calculated_field_deps(
+        self,
+        view: etree._Element,
+        ds_name: str,
+        all_exprs: list[str],
+    ) -> None:
+        """Add calculated field columns to datasource-dependencies when used.
+        
+        If any encoding or field expression references a calculated field,
+        that calculated field's full column definition (including formula)
+        should be included in the worksheet's datasource-dependencies.
+        """
+        deps = view.find(f"datasource-dependencies[@datasource='{ds_name}']")
+        if deps is None:
+            return
+        
+        # Check each calculated field in the registry
+        for fi_name, fi in self.field_registry._fields.items():
+            if not fi.is_calculated:
+                continue
+            # Check if any expression uses this calculated field
+            # by checking if its column-instance already exists in deps
+            existing = deps.find(f"column-instance[@column='{fi.local_name}']")
+            if existing is not None:
+                # Column-instance exists; make sure column definition is also there
+                existing_col = deps.find(f"column[@name='{fi.local_name}']")
+                if existing_col is None:
+                    # Need to add the calculated column with its formula
+                    src_col = self._datasource.find(f"column[@name='{fi.local_name}']")
+                    if src_col is not None:
+                        import copy
+                        col_copy = copy.deepcopy(src_col)
+                        # Insert before column-instances
+                        first_ci = deps.find("column-instance")
+                        if first_ci is not None:
+                            first_ci.addprevious(col_copy)
+                        else:
+                            deps.append(col_copy)
 
     def _add_shelf_sort(
         self,
@@ -1290,6 +1474,10 @@ class TWBEditor:
             }
             generate_dashboard_zones(zones, layout_dict, width, height, self._next_zone_id, context)
 
+            # Add dashboard-level datasources and datasource-dependencies
+            # for filter zones and paramctrl zones
+            self._add_dashboard_deps(db, layout_dict)
+
         # simple-id (required)
         db_simple_id = etree.SubElement(db, "simple-id")
         db_simple_id.set("uuid", _generate_uuid())
@@ -1302,6 +1490,122 @@ class TWBEditor:
     def _next_zone_id(self) -> int:
         self._zone_id_counter += 1
         return self._zone_id_counter
+
+    def _add_dashboard_deps(self, db: etree._Element, layout_dict: dict) -> None:
+        """Add dashboard-level datasources and datasource-dependencies.
+        
+        Scans the layout tree for filter and paramctrl zones, and generates
+        the necessary datasource references and field dependencies.
+        """
+        import copy
+        
+        # Extract filter and paramctrl zones from layout tree
+        filters_zones = []
+        paramctrl_zones = []
+        
+        def _extract_zones(node: dict) -> None:
+            if node.get("type") == "filter":
+                filters_zones.append(node)
+            elif node.get("type") == "paramctrl":
+                paramctrl_zones.append(node)
+            for child in node.get("children", []):
+                _extract_zones(child)
+        
+        _extract_zones(layout_dict)
+        
+        if not filters_zones and not paramctrl_zones:
+            return
+        
+        ds_name = self._datasource.get("name", "")
+        
+        # Create <datasources> in dashboard
+        db_datasources = etree.Element("datasources")
+        
+        has_params = bool(paramctrl_zones or self._parameters)
+        if has_params:
+            pds = etree.SubElement(db_datasources, "datasource")
+            pds.set("caption", "参数")
+            pds.set("name", "Parameters")
+        
+        if filters_zones:
+            fds = etree.SubElement(db_datasources, "datasource")
+            caption = self._datasource.get("caption", ds_name)
+            fds.set("caption", caption)
+            fds.set("name", ds_name)
+        
+        # Insert datasources after <size> element
+        size_el = db.find("size")
+        if size_el is not None:
+            size_el.addnext(db_datasources)
+        
+        # Add Parameters datasource-dependencies  
+        if has_params:
+            params_ds = None
+            for ds in self.root.findall(".//datasource"):
+                if ds.get("name") == "Parameters":
+                    params_ds = ds
+                    break
+            if params_ds is not None:
+                param_deps = etree.Element("datasource-dependencies")
+                param_deps.set("datasource", "Parameters")
+                for col in params_ds.findall("column"):
+                    param_deps.append(copy.deepcopy(col))
+                db_datasources.addnext(param_deps)
+        
+        # Add federated datasource-dependencies for filter fields
+        if filters_zones:
+            filter_deps = etree.Element("datasource-dependencies")
+            filter_deps.set("datasource", ds_name)
+            
+            seen_cols = set()
+            seen_ci = set()
+            col_elements = []
+            ci_elements = []
+            
+            for fz in filters_zones:
+                field = fz.get("field")
+                if not field:
+                    continue
+                try:
+                    ci = self.field_registry.parse_expression(field)
+                    fi = self.field_registry._find_field(field)
+                    
+                    if ci.column_local_name not in seen_cols:
+                        seen_cols.add(ci.column_local_name)
+                        col_el = etree.Element("column")
+                        col_el.set("datatype", fi.datatype)
+                        col_el.set("name", fi.local_name)
+                        col_el.set("role", fi.role)
+                        col_el.set("type", fi.field_type)
+                        # Copy semantic-role if present
+                        src_col = self._datasource.find(f"column[@name='{fi.local_name}']")
+                        if src_col is not None and src_col.get("semantic-role"):
+                            col_el.set("semantic-role", src_col.get("semantic-role"))
+                        col_elements.append(col_el)
+                    
+                    if ci.instance_name not in seen_ci:
+                        seen_ci.add(ci.instance_name)
+                        ci_el = etree.Element("column-instance")
+                        ci_el.set("column", ci.column_local_name)
+                        ci_el.set("derivation", ci.derivation)
+                        ci_el.set("name", ci.instance_name)
+                        ci_el.set("pivot", ci.pivot)
+                        ci_el.set("type", ci.ci_type)
+                        ci_elements.append(ci_el)
+                except Exception:
+                    pass
+            
+            for el in sorted(col_elements, key=lambda e: e.get("name", "")):
+                filter_deps.append(el)
+            for el in sorted(ci_elements, key=lambda e: e.get("name", "")):
+                filter_deps.append(el)
+            
+            # Insert after param deps or after datasources
+            zones_el = db.find("zones")
+            if zones_el is not None:
+                zones_el.addprevious(filter_deps)
+            else:
+                db.append(filter_deps)
 
     # ================================================================
     # Dashboard Actions

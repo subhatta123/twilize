@@ -65,7 +65,7 @@ def main():
 
     result = add_calculated_field(
         "Order Profitable?",
-        "IF SUM([Profit]) > 0 THEN 'Profitable' ELSE 'Unprofitable' END",
+        "IF SUM([Profit]) > [Target Profit] THEN 'Profitable' ELSE 'Unprofitable' END",
         "string",
     )
     print(result)
@@ -95,7 +95,7 @@ def main():
         worksheet_name="SaleMap",
         mark_type="Map",
         geographic_field="State/Province",
-        color="SUM(Profit)",
+        color="Order Profitable?",
         size="SUM(Sales)",
     )
     print(result)

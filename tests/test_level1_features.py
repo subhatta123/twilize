@@ -141,7 +141,7 @@ class TestMapChart(unittest.TestCase):
         # Mark type should be Automatic (Tableau maps use Automatic)
         pane = table.find(".//pane")
         mark = pane.find("mark")
-        self.assertEqual(mark.get("class"), "Automatic")
+        self.assertEqual(mark.get("class"), "Multipolygon")
 
         # Mapsources should be present in view
         view = table.find("view")
