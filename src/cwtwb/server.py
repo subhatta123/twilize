@@ -17,6 +17,12 @@ from .mcp.tools_support import (
     diff_template_gap,
     list_capabilities,
 )
+from .mcp.tools_pipeline import (
+    csv_to_dashboard,
+    csv_to_hyper,
+    inspect_csv,
+    suggest_charts_for_csv,
+)
 from .mcp.tools_workbook import (
     add_calculated_field,
     add_dashboard,

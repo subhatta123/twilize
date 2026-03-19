@@ -32,6 +32,19 @@ dev = [
 examples = [
     "tableauhyperapi>=0.0.21408",
 ]
+pipeline = [
+    "tableauhyperapi>=0.0.21408",
+]
+docapi = [
+    "tableaudocumentapi>=0.5",
+]
+extension = [
+    "fastapi>=0.100",
+    "uvicorn>=0.20",
+    "httpx>=0.24",
+    "tableauhyperapi>=0.0.21408",
+    "python-multipart",
+]
 
 [project.scripts]
 cwtwb = "cwtwb.server:main"
