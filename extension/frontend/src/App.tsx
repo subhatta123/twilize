@@ -7,7 +7,7 @@ import ProgressIndicator from './components/ProgressIndicator'
 import DownloadPanel from './components/DownloadPanel'
 import { useTableauData } from './hooks/useTableauData'
 import { useGeneration } from './hooks/useGeneration'
-import type { DashboardPlan, FieldInfo } from './utils/types'
+import type { DashboardPlan } from './utils/types'
 
 type Step = 'data' | 'prompt' | 'preview' | 'generating' | 'download'
 

@@ -452,12 +452,34 @@ class ConnectionsMixin:
             if not target_tables:
                 target_tables = schema_info["tables"][:1]
 
+        fed_conn = self._datasource.find("connection[@class='federated']")
+
+        # Place <metadata-records> inside the federated <connection>, per XSD
+        if fed_conn is not None:
+            metadata_records = fed_conn.find("metadata-records")
+            if metadata_records is None:
+                metadata_records = etree.SubElement(fed_conn, "metadata-records")
+        else:
+            metadata_records = None
+
         ds_name = self._datasource.get("name", "")
 
-        # Ensure <metadata-records> container exists
-        metadata_records = self._datasource.find("metadata-records")
-        if metadata_records is None:
-            metadata_records = etree.SubElement(self._datasource, "metadata-records")
+        # Find the correct insertion point for <column> elements.
+        # XSD order: ...aliases → column* → column-instance → ...layout → style...
+        # Insert before the first element that must come after columns.
+        _AFTER_COLUMN = {
+            "column-instance", "group", "mapped-images", "drill-paths",
+            "unlinked-server-hierarchies", "folders-common", "folders-parameters",
+            "actions", "calculated-members", "extract", "layout", "style",
+            "semantic-values", "date-options", "default-date-format",
+            "default-sorts", "field-sort-info", "datasource-dependencies",
+            "explainability", "filter", "object-graph",
+        }
+        col_insert_idx = len(self._datasource)
+        for i, child in enumerate(self._datasource):
+            if child.tag in _AFTER_COLUMN:
+                col_insert_idx = i
+                break
 
         for tbl in target_tables:
             suffix = f" ({tbl['name']})" if len(target_tables) > 1 else ""
@@ -477,31 +499,34 @@ class ConnectionsMixin:
                 display_name = f"{col_name}{suffix}"
                 local_name = f"[{display_name}]"
 
-                # Create <column> element on datasource
-                col_el = etree.SubElement(self._datasource, "column")
+                # Create <column> element at the correct XSD position
+                col_el = etree.Element("column")
                 col_el.set("datatype", datatype)
                 col_el.set("name", local_name)
                 col_el.set("role", role)
                 col_el.set("type", field_type)
                 if suffix:
                     col_el.set("caption", display_name)
+                self._datasource.insert(col_insert_idx, col_el)
+                col_insert_idx += 1
 
-                # Create <metadata-record class="column">
-                mr = etree.SubElement(metadata_records, "metadata-record")
-                mr.set("class", "column")
+                # Create <metadata-record class="column"> inside connection
+                if metadata_records is not None:
+                    mr = etree.SubElement(metadata_records, "metadata-record")
+                    mr.set("class", "column")
 
-                remote_name_el = etree.SubElement(mr, "remote-name")
-                remote_name_el.text = col_name
+                    remote_name_el = etree.SubElement(mr, "remote-name")
+                    remote_name_el.text = col_name
 
-                remote_type_el = etree.SubElement(mr, "remote-type")
-                remote_type_el.text = remote_type
+                    remote_type_el = etree.SubElement(mr, "remote-type")
+                    remote_type_el.text = remote_type
 
-                local_name_el = etree.SubElement(mr, "local-name")
-                local_name_el.text = local_name
+                    local_name_el = etree.SubElement(mr, "local-name")
+                    local_name_el.text = local_name
 
-                parent_name_el = etree.SubElement(mr, "parent-name")
-                parent_name_el.text = f"[{ds_name}]"
+                    parent_name_el = etree.SubElement(mr, "parent-name")
+                    parent_name_el.text = f"[{ds_name}]"
 
-                local_type_el = etree.SubElement(mr, "local-type")
-                local_type_el.text = datatype
+                    local_type_el = etree.SubElement(mr, "local-type")
+                    local_type_el.text = datatype
 

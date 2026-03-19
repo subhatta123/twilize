@@ -26,8 +26,7 @@ declare const tableau: {
 
 export async function initTableauExtension(): Promise<void> {
   if (typeof tableau === 'undefined') {
-    console.warn('Tableau Extensions API not available (running outside Tableau)')
-    return
+    throw new Error('Tableau Extensions API not available')
   }
   await tableau.extensions.initializeAsync()
 }
@@ -38,7 +37,7 @@ export async function extractTableauData(): Promise<{
   rowCount: number
 }> {
   if (typeof tableau === 'undefined') {
-    return { fields: [], dataRows: [], rowCount: 0 }
+    throw new Error('Tableau Extensions API not available')
   }
 
   const dashboard = tableau.extensions.dashboardContent.dashboard

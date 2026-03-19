@@ -57,8 +57,11 @@ def suggest_dashboard(
         except Exception as exc:
             logger.warning("LLM suggestion failed, falling back to rules: %s", exc)
 
-    # Rule-based fallback
-    suggestion = suggest_charts(classified, max_charts=max_charts)
+    # Rule-based fallback — incorporate image analysis if available
+    if image_analysis and image_analysis.get("panels"):
+        suggestion = _image_guided_suggest(classified, image_analysis, max_charts)
+    else:
+        suggestion = suggest_charts(classified, max_charts=max_charts)
     return _suggestion_to_dict(suggestion)
 
 
@@ -169,6 +172,128 @@ def _call_openai(system_prompt: str, user_msg: str, api_key: str) -> dict:
     response.raise_for_status()
     text = response.json()["choices"][0]["message"]["content"]
     return json.loads(text)
+
+
+def _image_guided_suggest(
+    schema: ClassifiedSchema,
+    image_analysis: dict,
+    max_charts: int,
+) -> DashboardSuggestion:
+    """Use image analysis panels as a template for rule-based suggestion.
+
+    Maps each panel's chart_type from the image to the available fields,
+    creating shelf assignments that match the image layout.
+    """
+    panels = image_analysis.get("panels", [])
+    if not panels:
+        return suggest_charts(schema, max_charts=max_charts)
+
+    dims = schema.dimensions
+    measures = schema.measures
+    temporal = schema.temporal
+    geographic = schema.geographic
+    cat_dims = [d for d in dims if d.semantic_type == "categorical"]
+
+    # Map image chart types to cwtwb mark types
+    _IMAGE_TYPE_MAP = {
+        "bar": "Bar",
+        "line": "Line",
+        "pie": "Pie",
+        "scatter": "Scatterplot",
+        "scatterplot": "Scatterplot",
+        "map": "Map",
+        "heatmap": "Heatmap",
+        "treemap": "Tree Map",
+        "text": "Text",
+        "kpi": "Text",
+        "area": "Area",
+    }
+
+    charts: list[ChartSuggestion] = []
+    used_measures: list[int] = []  # track which measures have been used
+
+    for i, panel in enumerate(panels[:max_charts]):
+        raw_type = panel.get("chart_type", "bar").lower().strip()
+        mark_type = _IMAGE_TYPE_MAP.get(raw_type, "Bar")
+        desc = panel.get("description", f"Chart {i + 1}")
+
+        shelves: list[ShelfAssignment] = []
+        measure_idx = i % len(measures) if measures else 0
+
+        if mark_type == "Line" and temporal and measures:
+            time_col = temporal[0]
+            m = measures[measure_idx % len(measures)]
+            shelves = [
+                ShelfAssignment(time_col.spec.name, "columns"),
+                ShelfAssignment(m.spec.name, "rows", "SUM"),
+            ]
+            if cat_dims and "by" in desc.lower():
+                shelves.append(ShelfAssignment(cat_dims[0].spec.name, "color"))
+        elif mark_type == "Bar" and cat_dims and measures:
+            dim = cat_dims[i % len(cat_dims)] if i < len(cat_dims) else cat_dims[0]
+            m = measures[measure_idx % len(measures)]
+            shelves = [
+                ShelfAssignment(dim.spec.name, "rows"),
+                ShelfAssignment(m.spec.name, "columns", "SUM"),
+            ]
+        elif mark_type == "Scatterplot" and len(measures) >= 2:
+            m1 = measures[0]
+            m2 = measures[1]
+            shelves = [
+                ShelfAssignment(m1.spec.name, "columns", "SUM"),
+                ShelfAssignment(m2.spec.name, "rows", "SUM"),
+            ]
+            if cat_dims:
+                shelves.append(ShelfAssignment(cat_dims[0].spec.name, "color"))
+        elif mark_type == "Pie" and cat_dims and measures:
+            dim = cat_dims[0]
+            m = measures[measure_idx % len(measures)]
+            shelves = [
+                ShelfAssignment(m.spec.name, "size", "SUM"),
+                ShelfAssignment(dim.spec.name, "color"),
+            ]
+        elif mark_type == "Map" and geographic and measures:
+            geo = geographic[0]
+            m = measures[measure_idx % len(measures)]
+            shelves = [
+                ShelfAssignment(geo.spec.name, "detail"),
+                ShelfAssignment(m.spec.name, "color", "SUM"),
+            ]
+        elif mark_type == "Text" and measures:
+            m = measures[measure_idx % len(measures)]
+            shelves = [ShelfAssignment(m.spec.name, "label", "SUM")]
+        elif mark_type == "Heatmap" and len(cat_dims) >= 2 and measures:
+            shelves = [
+                ShelfAssignment(cat_dims[0].spec.name, "columns"),
+                ShelfAssignment(cat_dims[1].spec.name, "rows"),
+                ShelfAssignment(measures[0].spec.name, "color", "SUM"),
+            ]
+        else:
+            # Fallback: bar chart with first available dim + measure
+            if cat_dims and measures:
+                shelves = [
+                    ShelfAssignment(cat_dims[0].spec.name, "rows"),
+                    ShelfAssignment(measures[measure_idx % len(measures)].spec.name, "columns", "SUM"),
+                ]
+            elif measures:
+                shelves = [ShelfAssignment(measures[0].spec.name, "label", "SUM")]
+                mark_type = "Text"
+
+        if shelves:
+            charts.append(ChartSuggestion(
+                chart_type=mark_type,
+                title=desc or f"{mark_type} Chart",
+                shelves=shelves,
+                reason=f"Matching reference image panel ({raw_type})",
+                priority=100 - i,
+            ))
+
+    layout = image_analysis.get("layout_type", "grid")
+    return DashboardSuggestion(
+        charts=charts,
+        layout=layout,
+        title="Dashboard",
+    )
 
 
 def _suggestion_to_dict(suggestion: DashboardSuggestion) -> dict:

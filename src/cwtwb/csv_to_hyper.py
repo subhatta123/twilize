@@ -114,9 +114,16 @@ def _try_parse_date(value: str) -> bool:
 
 
 def _infer_column_type(values: list[str]) -> str:
-    """Infer the data type from a sample of non-null values."""
+    """Infer the data type from a sample of non-null values.
+
+    Uses a threshold approach (80% match) rather than break-on-first-failure
+    so a single oddly-formatted value doesn't poison the whole column.
+    """
     if not values:
         return "string"
+
+    n = len(values)
+    threshold = 0.8  # 80% of values must match
 
     # Check boolean
     bool_vals = {"true", "false", "yes", "no", "1", "0", "t", "f", "y", "n"}
@@ -130,25 +137,30 @@ def _infer_column_type(values: list[str]) -> str:
             int(v.strip().replace(",", ""))
             int_count += 1
         except ValueError:
-            break
-    if int_count == len(values):
+            pass
+    if int_count >= n * threshold:
         return "integer"
 
-    # Check float
+    # Check float (also handles currency/percentage formatting)
     float_count = 0
     for v in values:
         cleaned = v.strip().replace(",", "").replace("$", "").replace("%", "")
+        # Handle parenthesized negatives like (100.00)
+        if cleaned.startswith("(") and cleaned.endswith(")"):
+            cleaned = cleaned[1:-1]
+        if cleaned.startswith("-"):
+            cleaned = cleaned[1:]
         try:
             float(cleaned)
             float_count += 1
         except ValueError:
-            break
-    if float_count == len(values):
+            pass
+    if float_count >= n * threshold:
         return "float"
 
     # Check date
     date_count = sum(1 for v in values[:20] if _try_parse_date(v))
-    if date_count >= len(values[:20]) * 0.8:
+    if date_count >= len(values[:20]) * threshold:
         return "date"
 
     return "string"
@@ -378,7 +390,11 @@ def csv_to_hyper(
                             elif col.inferred_type == "integer":
                                 typed_row.append(int(val.replace(",", "")))
                             elif col.inferred_type == "float":
-                                typed_row.append(float(val.replace(",", "").replace("$", "").replace("%", "")))
+                                cleaned = val.replace(",", "").replace("$", "").replace("%", "")
+                                # Handle parenthesized negatives like (100.00)
+                                if cleaned.startswith("(") and cleaned.endswith(")"):
+                                    cleaned = "-" + cleaned[1:-1]
+                                typed_row.append(float(cleaned))
                             elif col.inferred_type == "boolean":
                                 typed_row.append(val.lower() in ("true", "yes", "1", "t", "y"))
                             elif col.inferred_type == "date":

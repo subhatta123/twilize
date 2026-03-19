@@ -660,7 +660,12 @@ class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin,
         from .validator import SchemaValidationResult, validate_against_schema
         return validate_against_schema(self.root)
 
-    def save(self, output_path: str | Path, validate: bool = True) -> str:
+    def save(
+        self,
+        output_path: str | Path,
+        validate: bool = True,
+        extra_files: list[str | Path] | None = None,
+    ) -> str:
         """Save the workbook as a .twb or .twbx file.
 
         Args:
@@ -670,6 +675,8 @@ class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin,
                 opened). Use .twb for a plain XML workbook.
             validate: If True (default), run structural validation before saving.
                       Raises TWBValidationError if the structure is broken.
+            extra_files: Additional files (e.g. .hyper extracts) to bundle
+                into the .twbx archive under ``Data/Extracts/``.
 
         Returns:
             Confirmation message.
@@ -704,6 +711,13 @@ class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin,
                         for info in zsrc.infolist():
                             if info.filename != self._twbx_twb_name:
                                 zout.writestr(info, zsrc.read(info.filename))
+                # Bundle extra files (e.g. Hyper extracts)
+                if extra_files:
+                    for fpath in extra_files:
+                        fpath = Path(fpath)
+                        if fpath.exists():
+                            arcname = f"Data/Extracts/{fpath.name}"
+                            zout.write(fpath, arcname)
         else:
             self.tree.write(
                 str(output_path),

@@ -23,8 +23,13 @@ def main():
     args = parser.parse_args()
 
     ext_dir = Path(__file__).resolve().parent.parent
+    project_root = ext_dir.parent
     frontend_dir = ext_dir / "frontend"
     backend_dir = ext_dir / "backend"
+
+    # Ensure project root is on sys.path so "extension.backend.app" resolves
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
 
     if args.dev:
         print(f"Starting dev mode...")

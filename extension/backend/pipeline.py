@@ -8,18 +8,28 @@ from __future__ import annotations
 
 import csv
 import logging
+import re
 import tempfile
 import uuid
 from pathlib import Path
 from typing import Any
 
 from cwtwb.chart_suggester import DashboardSuggestion
-from cwtwb.csv_to_hyper import CsvSchema, infer_csv_schema, csv_to_hyper
-from cwtwb.pipeline import build_dashboard_from_csv, _safe_worksheet_name, _build_chart_kwargs, _build_layout
+from cwtwb.csv_to_hyper import (
+    ColumnSpec,
+    CsvSchema,
+    classify_columns,
+    csv_to_hyper,
+)
+from cwtwb.pipeline import (
+    _safe_worksheet_name,
+    _build_chart_kwargs,
+    _build_layout,
+)
 from cwtwb.twb_editor import TWBEditor
 
 from .chart_suggestion import dict_to_suggestion
-from .schema_inference import TableauField, classify_tableau_fields
+from .schema_inference import TableauField, _TABLEAU_TYPE_MAP
 
 logger = logging.getLogger(__name__)
 
@@ -32,17 +42,12 @@ def generate_workbook(
 ) -> str:
     """Generate a .twbx workbook from extension data and plan.
 
-    Steps:
-        1. Write data to a temporary CSV
-        2. Create Hyper extract from CSV
-        3. Create workbook from default template
-        4. Connect to Hyper extract
-        5. Create worksheets and configure charts per plan
-        6. Build dashboard with layout
-        7. Save as .twbx
+    Instead of re-inferring types from CSV text (lossy), we use the
+    accurate type information that Tableau already provided via the
+    Extensions API.
 
     Args:
-        fields: Field descriptors from the extension.
+        fields: Field descriptors from the extension (with accurate types).
         data_rows: Raw data rows (list of lists).
         plan: Dashboard plan dict (from suggest_dashboard).
         output_dir: Directory for output .twbx. Defaults to temp dir.
@@ -67,17 +72,84 @@ def generate_workbook(
 
     logger.info("Wrote %d rows to %s", len(data_rows), csv_path)
 
-    # Step 2-9: Use the main pipeline
-    suggestion = dict_to_suggestion(plan)
-    title = plan.get("title", "Extension Dashboard")
-    output_path = work_dir / f"{title.replace(' ', '_')}_{run_id}.twbx"
+    # Step 2: Build schema from Tableau's type metadata (NOT re-inferred from CSV)
+    # This preserves the accurate types Tableau already knows about
+    row_count = len(data_rows)
+    tab_columns = []
+    for f in fields:
+        cwtwb_type = _TABLEAU_TYPE_MAP.get(f.datatype, "string")
+        tab_columns.append(ColumnSpec(
+            name=f.name,
+            inferred_type=cwtwb_type,
+            sample_values=f.sample_values[:5] if f.sample_values else [],
+            null_count=0,
+            cardinality=f.cardinality,
+            total_rows=row_count,
+        ))
 
-    result = build_dashboard_from_csv(
-        csv_path=str(csv_path),
-        output_path=str(output_path),
-        dashboard_title=title,
-        suggestion=suggestion,
+    schema = CsvSchema(
+        columns=tab_columns,
+        row_count=row_count,
+        file_path=str(csv_path),
     )
+    classified = classify_columns(schema)
+
+    # Step 3: Create Hyper extract using the Tableau-provided schema
+    hyper_path = work_dir / f"data_{run_id}.hyper"
+    logger.info("Creating Hyper extract at %s", hyper_path)
+    csv_to_hyper(csv_path, hyper_path, schema=schema, table_name="Extract")
+
+    # Step 4: Create workbook from template
+    logger.info("Creating workbook from template")
+    editor = TWBEditor()
+
+    # Step 5: Connect to Hyper extract
+    logger.info("Connecting to Hyper extract")
+    editor.set_hyper_connection(str(hyper_path), table_name="Extract")
+    # Rewrite dbname to relative archive path for .twbx packaging
+    hyper_archive_path = f"Data/Extracts/{hyper_path.name}"
+    for conn_el in editor._datasource.findall(".//connection[@class='hyper']"):
+        conn_el.set("dbname", hyper_archive_path)
+
+    # Step 6: Create worksheets and configure charts per plan
+    suggestion = dict_to_suggestion(plan)
+    worksheet_names = []
+
+    for i, chart in enumerate(suggestion.charts):
+        ws_name = _safe_worksheet_name(chart.title, i)
+        worksheet_names.append(ws_name)
+
+        logger.info("Creating worksheet: %s (%s)", ws_name, chart.chart_type)
+        editor.add_worksheet(ws_name)
+
+        chart_kwargs = _build_chart_kwargs(chart)
+        try:
+            editor.configure_chart(ws_name, **chart_kwargs)
+        except Exception as exc:
+            logger.warning(
+                "Failed to configure chart '%s': %s. Skipping.", ws_name, exc
+            )
+            worksheet_names.pop()
+            continue
+
+    if not worksheet_names:
+        raise RuntimeError("All chart configurations failed. Cannot build dashboard.")
+
+    # Step 7: Create dashboard
+    title = plan.get("title", "Extension Dashboard")
+    logger.info("Creating dashboard: %s", title)
+    layout = _build_layout(suggestion.layout, worksheet_names)
+    editor.add_dashboard(
+        dashboard_name=title,
+        worksheet_names=worksheet_names,
+        layout=layout,
+    )
+
+    # Step 8: Save as .twbx
+    safe_title = re.sub(r'[<>:"/\\|?*]', '', title).replace(' ', '_').strip('_') or "Dashboard"
+    output_path = work_dir / f"{safe_title}_{run_id}.twbx"
+    logger.info("Saving workbook to %s", output_path)
+    editor.save(str(output_path), extra_files=[str(hyper_path)])
 
     logger.info("Generated workbook: %s", output_path)
     return str(output_path)

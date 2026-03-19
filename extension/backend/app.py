@@ -17,15 +17,30 @@ import uuid
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from .chart_suggestion import dict_to_suggestion, suggest_dashboard
 from .image_analysis import analyze_reference_image
 from .pipeline import generate_workbook
 from .schema_inference import TableauField
+
+
+class SuggestRequest(BaseModel):
+    fields: list[dict]
+    prompt: str = ""
+    row_count: int = 0
+    max_charts: int = 6
+    image_base64: str = ""
+
+
+class GenerateRequest(BaseModel):
+    fields: list[dict]
+    data_rows: list[list[Any]]
+    plan: dict
 
 logger = logging.getLogger(__name__)
 
@@ -49,22 +64,8 @@ _jobs: dict[str, dict] = {}
 
 
 @app.post("/api/suggest")
-async def suggest(
-    fields: list[dict],
-    prompt: str = "",
-    row_count: int = 0,
-    max_charts: int = 6,
-    image_base64: str = "",
-) -> JSONResponse:
-    """Suggest a dashboard layout from field schema and prompt.
-
-    Request body:
-        fields: list of {name, datatype, role?, cardinality?, sample_values?}
-        prompt: natural-language dashboard description
-        row_count: total row count
-        max_charts: max charts to suggest
-        image_base64: optional reference image (base64-encoded)
-    """
+async def suggest(req: SuggestRequest) -> JSONResponse:
+    """Suggest a dashboard layout from field schema and prompt."""
     tableau_fields = [
         TableauField(
             name=f["name"],
@@ -73,40 +74,27 @@ async def suggest(
             cardinality=f.get("cardinality", 0),
             sample_values=f.get("sample_values", []),
         )
-        for f in fields
+        for f in req.fields
     ]
 
     image_analysis = None
-    if image_base64:
-        image_analysis = analyze_reference_image(image_base64=image_base64)
+    if req.image_base64:
+        image_analysis = analyze_reference_image(image_base64=req.image_base64)
 
     plan = suggest_dashboard(
         fields=tableau_fields,
-        row_count=row_count,
-        prompt=prompt,
+        row_count=req.row_count,
+        prompt=req.prompt,
         image_analysis=image_analysis,
-        max_charts=max_charts,
+        max_charts=req.max_charts,
     )
 
     return JSONResponse(content=plan)
 
 
 @app.post("/api/generate")
-async def generate(
-    fields: list[dict],
-    data_rows: list[list[Any]],
-    plan: dict,
-) -> FileResponse:
-    """Generate a .twbx workbook from data and a dashboard plan.
-
-    Request body:
-        fields: list of {name, datatype, ...}
-        data_rows: list of row arrays
-        plan: dashboard plan dict (from /api/suggest)
-
-    Returns:
-        .twbx file download
-    """
+async def generate(req: GenerateRequest) -> FileResponse:
+    """Generate a .twbx workbook from data and a dashboard plan."""
     job_id = uuid.uuid4().hex[:8]
     _jobs[job_id] = {"status": "running", "progress": 0}
 
@@ -118,14 +106,14 @@ async def generate(
                 role=f.get("role", ""),
                 cardinality=f.get("cardinality", 0),
             )
-            for f in fields
+            for f in req.fields
         ]
 
         _jobs[job_id]["progress"] = 20
         output_path = generate_workbook(
             fields=tableau_fields,
-            data_rows=data_rows,
-            plan=plan,
+            data_rows=req.data_rows,
+            plan=req.plan,
         )
 
         _jobs[job_id] = {"status": "completed", "progress": 100, "path": output_path}
@@ -137,6 +125,7 @@ async def generate(
             filename=filename,
         )
     except Exception as exc:
+        logger.exception("Generate failed: %s", exc)
         _jobs[job_id] = {"status": "failed", "error": str(exc)}
         raise HTTPException(status_code=500, detail=str(exc))
 

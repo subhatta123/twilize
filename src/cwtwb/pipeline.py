@@ -99,8 +99,13 @@ def build_dashboard_from_csv(
     editor = TWBEditor(template_path)
 
     # Step 6: Connect to Hyper extract
+    # First connect with the real path so _rebuild_fields_from_hyper can read it
     logger.info("Connecting to Hyper extract")
     editor.set_hyper_connection(str(hyper_path), table_name="Extract")
+    # Rewrite the dbname to the relative archive path for .twbx packaging
+    hyper_archive_path = f"Data/Extracts/{hyper_path.name}"
+    for conn_el in editor._datasource.findall(".//connection[@class='hyper']"):
+        conn_el.set("dbname", hyper_archive_path)
 
     # Step 7: Create worksheets and configure charts
     worksheet_names = []
@@ -138,9 +143,9 @@ def build_dashboard_from_csv(
         layout=layout,
     )
 
-    # Step 9: Save as .twbx
+    # Step 9: Save as .twbx (bundle the Hyper extract)
     logger.info("Saving workbook to %s", output_path)
-    result = editor.save(str(output_path))
+    result = editor.save(str(output_path), extra_files=[str(hyper_path)])
 
     return (
         f"Dashboard created: {output_path}\n"
