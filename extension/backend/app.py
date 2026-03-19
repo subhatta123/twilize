@@ -1,0 +1,173 @@
+"""FastAPI server for the cwtwb Tableau Dashboard Extension.
+
+Endpoints:
+    POST /api/suggest  — receive schema + prompt + optional image → dashboard plan
+    POST /api/generate — receive schema + data + plan → .twbx file download
+    GET  /api/status/{id} — poll generation progress
+
+In production, also serves the built Vite frontend as static files.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+import tempfile
+import uuid
+from pathlib import Path
+from typing import Any, Optional
+
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+
+from .chart_suggestion import dict_to_suggestion, suggest_dashboard
+from .image_analysis import analyze_reference_image
+from .pipeline import generate_workbook
+from .schema_inference import TableauField
+
+logger = logging.getLogger(__name__)
+
+app = FastAPI(
+    title="cwtwb Dashboard Extension",
+    description="Generate Tableau dashboards from connected data",
+    version="0.1.0",
+)
+
+# CORS for Tableau extension and Vite dev server
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# In-progress generation tracking
+_jobs: dict[str, dict] = {}
+
+
+@app.post("/api/suggest")
+async def suggest(
+    fields: list[dict],
+    prompt: str = "",
+    row_count: int = 0,
+    max_charts: int = 6,
+    image_base64: str = "",
+) -> JSONResponse:
+    """Suggest a dashboard layout from field schema and prompt.
+
+    Request body:
+        fields: list of {name, datatype, role?, cardinality?, sample_values?}
+        prompt: natural-language dashboard description
+        row_count: total row count
+        max_charts: max charts to suggest
+        image_base64: optional reference image (base64-encoded)
+    """
+    tableau_fields = [
+        TableauField(
+            name=f["name"],
+            datatype=f.get("datatype", "string"),
+            role=f.get("role", ""),
+            cardinality=f.get("cardinality", 0),
+            sample_values=f.get("sample_values", []),
+        )
+        for f in fields
+    ]
+
+    image_analysis = None
+    if image_base64:
+        image_analysis = analyze_reference_image(image_base64=image_base64)
+
+    plan = suggest_dashboard(
+        fields=tableau_fields,
+        row_count=row_count,
+        prompt=prompt,
+        image_analysis=image_analysis,
+        max_charts=max_charts,
+    )
+
+    return JSONResponse(content=plan)
+
+
+@app.post("/api/generate")
+async def generate(
+    fields: list[dict],
+    data_rows: list[list[Any]],
+    plan: dict,
+) -> FileResponse:
+    """Generate a .twbx workbook from data and a dashboard plan.
+
+    Request body:
+        fields: list of {name, datatype, ...}
+        data_rows: list of row arrays
+        plan: dashboard plan dict (from /api/suggest)
+
+    Returns:
+        .twbx file download
+    """
+    job_id = uuid.uuid4().hex[:8]
+    _jobs[job_id] = {"status": "running", "progress": 0}
+
+    try:
+        tableau_fields = [
+            TableauField(
+                name=f["name"],
+                datatype=f.get("datatype", "string"),
+                role=f.get("role", ""),
+                cardinality=f.get("cardinality", 0),
+            )
+            for f in fields
+        ]
+
+        _jobs[job_id]["progress"] = 20
+        output_path = generate_workbook(
+            fields=tableau_fields,
+            data_rows=data_rows,
+            plan=plan,
+        )
+
+        _jobs[job_id] = {"status": "completed", "progress": 100, "path": output_path}
+
+        filename = Path(output_path).name
+        return FileResponse(
+            path=output_path,
+            media_type="application/octet-stream",
+            filename=filename,
+        )
+    except Exception as exc:
+        _jobs[job_id] = {"status": "failed", "error": str(exc)}
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/status/{job_id}")
+async def status(job_id: str) -> JSONResponse:
+    """Check generation progress."""
+    if job_id not in _jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return JSONResponse(content=_jobs[job_id])
+
+
+@app.get("/api/health")
+async def health() -> JSONResponse:
+    """Health check endpoint."""
+    return JSONResponse(content={"status": "ok", "version": "0.1.0"})
+
+
+# Mount built frontend in production
+_frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+if _frontend_dist.exists():
+    app.mount("/", StaticFiles(directory=str(_frontend_dist), html=True), name="frontend")
+
+
+def main():
+    """Run the extension server."""
+    import uvicorn
+
+    port = int(os.environ.get("CWTWB_EXT_PORT", "8000"))
+    uvicorn.run(app, host="0.0.0.0", port=port)
+
+
+if __name__ == "__main__":
+    main()

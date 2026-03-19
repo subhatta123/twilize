@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest manifest-version="0.1">
+  <dashboard-extension id="com.cwtwb.dashboard-builder" extension-version="0.1.0">
+    <default-locale>en_US</default-locale>
+    <name resource-id="name">cwtwb Dashboard Builder</name>
+    <description>Generate Tableau dashboards from connected data using AI-powered suggestions</description>
+    <author name="cwtwb" email="cwtwb@example.com" organization="cwtwb" website="https://github.com/imgwho/cwtwb"/>
+    <min-api-version>1.7</min-api-version>
+    <source-location>
+      <url>http://localhost:8000</url>
+    </source-location>
+    <icon>iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAALEwAACxMBAJqcGAAAAlhJREFUOI2Nkj1oU2EUhp9z/5KbJje1DVVQS2mDUFBBxEFwEHQQnNRBHAQ3cRBcXBzEyUkHFxc3FydBHEQUBBdBVBBErYgKirYN/UnTJPfm3nt9HCJtIYgHvss5w3nO9x1R1d/q9F1i4rHhymv4q1FIOT/dMaSJG8ZvPrdkfMvjY7WJ0XvbhCx81LFWxD3S5FfRuVOkupcxL9w3kMjY9eaJN5eFauPPDzTEGdyO5tWUerVEZ6ezlIZSYilHmUqReMKsq8zNbkwBqJn5S6/5T3T45d6u8pfxH/2K4m3+i3l7LGp0h1bOS1lKXUn3FNqWR+E1W3vPbj+ZYBg8FrPQvOYzXjp23fKVp3GiwfNQJ3XSBOqVmN1pUBf/cxT5dV+yD3xJi5RYv5eKFzLFUcDJI1T/G/lDlbKpXTQDdCeA4JIA1HgGZIMXKITM7IKXATOAI1YjINZIPjOi/0Qa5U3TkyePVuanr7iqEy3VvG2j6p3Z02ceTl+4XCKL7FxC9lgiKHPEw2b+vr69x3ev3EwefjoH7oH+Ui+8NXPiS0vFU2M6WtPSzKZoJaGJDVBVZkZ4vp/wDnf+oT3yemxwunZK2Y6VYqmjzRGF0l4ISMXEw03Nv9F7sF7GBvzXPNv</icon>
+    <permissions>
+      <permission>full data</permission>
+    </permissions>
+  </dashboard-extension>
+  <resources>
+    <resource id="name">
+      <text locale="en_US">cwtwb Dashboard Builder</text>
+    </resource>
+  </resources>
+</manifest>
