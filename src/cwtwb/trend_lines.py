@@ -59,7 +59,7 @@ class TrendLineMixin:
             for old in pane.findall("trendline"):
                 pane.remove(old)
 
-            tl = etree.SubElement(pane, "trendline")
+            tl = etree.Element("trendline")
             tl.set("enabled", "true")
             tl.set("fit", fit)
             tl.set("exclude-intercept", "false")
@@ -70,6 +70,16 @@ class TrendLineMixin:
 
             if fit == "polynomial":
                 tl.set("degree", str(degree))
+
+            # Insert trendline after style/encodings but before reference-line
+            # per XSD ordering: ...DropLine → Trendline → ReferenceLine...
+            insert_idx = len(pane)
+            for i, child in enumerate(pane):
+                if child.tag in ("reference-line", "customized-tooltip",
+                                 "customized-label", "style-rule"):
+                    insert_idx = i
+                    break
+            pane.insert(insert_idx, tl)
 
             count += 1
 
