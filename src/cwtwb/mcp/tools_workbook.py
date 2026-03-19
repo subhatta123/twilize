@@ -56,6 +56,29 @@ def _snapshot(label: str) -> None:
         pass  # No active editor yet — nothing to snapshot
 
 
+def _validate_worksheet_exists(editor: TWBEditor, worksheet_name: str) -> None:
+    """Raise ValueError if the named worksheet doesn't exist in the workbook."""
+    existing = editor.list_worksheets()
+    if worksheet_name not in existing:
+        raise ValueError(
+            f"Worksheet '{worksheet_name}' not found. "
+            f"Existing worksheets: {', '.join(existing) or '(none)'}. "
+            f"Call add_worksheet first."
+        )
+
+
+def _validate_worksheets_exist(editor: TWBEditor, worksheet_names: list[str]) -> None:
+    """Raise ValueError if any of the named worksheets don't exist."""
+    existing = set(editor.list_worksheets())
+    missing = [n for n in worksheet_names if n not in existing]
+    if missing:
+        raise ValueError(
+            f"Worksheet(s) not found: {', '.join(missing)}. "
+            f"Existing worksheets: {', '.join(sorted(existing)) or '(none)'}. "
+            f"Call add_worksheet first."
+        )
+
+
 def _format_worksheets(editor: TWBEditor) -> str:
     """Render worksheet names as a compact human-readable section."""
     worksheets = editor.list_worksheets()
@@ -245,6 +268,7 @@ def configure_chart(
 
     _snapshot("configure_chart")
     editor = get_editor()
+    _validate_worksheet_exists(editor, worksheet_name)
     return editor.configure_chart(
         worksheet_name=worksheet_name,
         mark_type=mark_type,
@@ -308,6 +332,7 @@ def configure_dual_axis(
 
     _snapshot("configure_dual_axis")
     editor = get_editor()
+    _validate_worksheet_exists(editor, worksheet_name)
     return editor.configure_dual_axis(
         worksheet_name=worksheet_name,
         mark_type_1=mark_type_1,
@@ -369,6 +394,7 @@ def configure_worksheet_style(
 
     _snapshot("configure_worksheet_style")
     editor = get_editor()
+    _validate_worksheet_exists(editor, worksheet_name)
     return editor.configure_worksheet_style(
         worksheet_name=worksheet_name,
         background_color=background_color,
@@ -405,6 +431,7 @@ def configure_chart_recipe(
 
     _snapshot("configure_chart_recipe")
     editor = get_editor()
+    _validate_worksheet_exists(editor, worksheet_name)
     return configure_chart_recipe_impl(
         editor,
         worksheet_name,
@@ -503,6 +530,7 @@ def add_dashboard(
 
     _snapshot("add_dashboard")
     editor = get_editor()
+    _validate_worksheets_exist(editor, worksheet_names)
     return editor.add_dashboard(
         dashboard_name=dashboard_name,
         width=width,

@@ -162,6 +162,70 @@ def validate_against_schema(root: etree._Element) -> SchemaValidationResult:
     return SchemaValidationResult(valid=is_valid, errors=errors)
 
 
+def validate_editor_state(editor) -> list[str]:
+    """Check in-memory consistency of a TWBEditor instance.
+
+    Returns a list of issues found. Empty list means the state is consistent.
+    This is designed for use between MCP tool calls to catch problems early.
+    """
+    issues: list[str] = []
+
+    # 1. Check field registry matches XML datasource columns
+    xml_columns = set()
+    for mr in editor._datasource.findall(".//metadata-records/metadata-record"):
+        if mr.get("class") != "column":
+            continue
+        rn = mr.find("remote-name")
+        if rn is not None and rn.text:
+            xml_columns.add(rn.text)
+    for col in editor._datasource.findall("column"):
+        caption = col.get("caption")
+        if caption:
+            xml_columns.add(caption)
+        # Also check name (stripped of brackets) since some fields are registered
+        # by their local_name-derived display_name
+        name = col.get("name", "")
+        if name:
+            xml_columns.add(name.strip("[]"))
+
+    registry_fields = set(editor.field_registry._fields.keys())
+    orphaned = registry_fields - xml_columns
+    if orphaned:
+        issues.append(
+            f"Field registry has {len(orphaned)} field(s) not in XML: "
+            f"{', '.join(sorted(orphaned)[:5])}"
+        )
+
+    # 2. Check all worksheet names in windows match actual worksheets
+    worksheet_names = set(editor.list_worksheets())
+    windows_el = editor.root.find("windows")
+    if windows_el is not None:
+        for win in windows_el.findall("window"):
+            if win.get("class") == "worksheet":
+                win_name = win.get("name", "")
+                if win_name and win_name not in worksheet_names:
+                    issues.append(
+                        f"Window references worksheet '{win_name}' which does not exist"
+                    )
+
+    # 3. Check dashboard zones reference existing worksheets
+    dashboards_el = editor.root.find("dashboards")
+    if dashboards_el is not None:
+        for db in dashboards_el.findall("dashboard"):
+            db_name = db.get("name", "<unnamed>")
+            zones = db.find("zones")
+            if zones is not None:
+                for zone in zones.findall(".//zone"):
+                    zone_name = zone.get("name")
+                    if zone_name and zone_name not in worksheet_names:
+                        issues.append(
+                            f"Dashboard '{db_name}' zone references "
+                            f"worksheet '{zone_name}' which does not exist"
+                        )
+
+    return issues
+
+
 class TWBValidationError(Exception):
     """Raised when the TWB structure is fundamentally broken."""
     pass

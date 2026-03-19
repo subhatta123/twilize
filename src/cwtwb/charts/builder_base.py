@@ -102,11 +102,24 @@ class BaseChartBuilder:
         return all_exprs
 
     def _parse_and_prepare_instances(self, all_exprs: list[str], filters: Optional[list[dict]]) -> dict[str, ColumnInstance]:
-        """Parse expressions into ColumnInstances and normalize filter-side types."""
+        """Parse expressions into ColumnInstances and normalize filter-side types.
+
+        Collects all field resolution errors before raising, so the caller
+        sees every bad field at once instead of fixing them one at a time.
+        """
         instances: dict[str, ColumnInstance] = {}
+        errors: list[str] = []
         for expr in all_exprs:
-            ci = self.field_registry.parse_expression(expr)
-            instances[expr] = ci
+            try:
+                ci = self.field_registry.parse_expression(expr)
+                instances[expr] = ci
+            except (KeyError, ValueError) as exc:
+                errors.append(str(exc))
+        if errors:
+            raise ValueError(
+                f"{len(errors)} field error(s) in chart configuration:\n"
+                + "\n".join(f"  - {e}" for e in errors)
+            )
         if filters:
             for f in filters:
                 if f.get("type") == "quantitative" and f["column"] in instances:
