@@ -321,6 +321,9 @@ class ConnectionsMixin:
         for mr in self._datasource.findall(".//metadata-record"):
             mr.getparent().remove(mr)
 
+        # Rebuild <column> and <metadata-record> elements from Hyper schema
+        self._rebuild_fields_from_hyper(filepath, table_name, tables)
+
         self._reinit_fields()
         if tables and len(tables) > 1:
             names = ", ".join(t["name"] for t in tables)
@@ -391,4 +394,114 @@ class ConnectionsMixin:
                 og_rel.set("name", best_match["name"])
                 og_rel.set("table", f"[Extract].[{best_match['name']}]")
                 og_rel.set("type", "table")
+
+    # ------------------------------------------------------------------ #
+    #  Rebuild field metadata from Hyper schema                           #
+    # ------------------------------------------------------------------ #
+
+    # Map Hyper type strings to Tableau column metadata
+    _HYPER_TYPE_MAP = {
+        "DOUBLE": ("real", "measure", "quantitative", "5"),
+        "FLOAT": ("real", "measure", "quantitative", "5"),
+        "BIG_INT": ("integer", "measure", "quantitative", "20"),
+        "INTEGER": ("integer", "measure", "quantitative", "20"),
+        "INT": ("integer", "measure", "quantitative", "20"),
+        "SMALL_INT": ("integer", "measure", "quantitative", "2"),
+        "NUMERIC": ("real", "measure", "quantitative", "131"),
+        "DATE": ("date", "dimension", "ordinal", "7"),
+        "TIMESTAMP": ("datetime", "dimension", "ordinal", "135"),
+        "TIMESTAMP_TZ": ("datetime", "dimension", "ordinal", "135"),
+        "BOOL": ("boolean", "dimension", "nominal", "11"),
+        "TEXT": ("string", "dimension", "nominal", "130"),
+        "VARCHAR": ("string", "dimension", "nominal", "130"),
+        "CHAR": ("string", "dimension", "nominal", "130"),
+        "GEOGRAPHY": ("string", "dimension", "nominal", "130"),
+    }
+
+    def _rebuild_fields_from_hyper(
+        self,
+        filepath: str,
+        table_name: str,
+        tables: Optional[List[dict]],
+    ) -> None:
+        """Create <column> and <metadata-record> XML from Hyper file schema.
+
+        This ensures the field registry can be populated after the old
+        columns/metadata have been removed during connection setup.
+        """
+        try:
+            schema_info = inspect_hyper_schema(filepath)
+        except Exception:
+            # If we can't read the Hyper file (e.g. it doesn't exist yet
+            # during pipeline creation), skip — fields will be empty
+            return
+
+        if not schema_info.get("tables"):
+            return
+
+        # Determine which tables' columns to register
+        if tables and len(tables) > 1:
+            target_tables = schema_info["tables"]
+        else:
+            # Single-table: find matching table or use first
+            target_tables = []
+            for t in schema_info["tables"]:
+                if t["name"] == table_name:
+                    target_tables = [t]
+                    break
+            if not target_tables:
+                target_tables = schema_info["tables"][:1]
+
+        ds_name = self._datasource.get("name", "")
+
+        # Ensure <metadata-records> container exists
+        metadata_records = self._datasource.find("metadata-records")
+        if metadata_records is None:
+            metadata_records = etree.SubElement(self._datasource, "metadata-records")
+
+        for tbl in target_tables:
+            suffix = f" ({tbl['name']})" if len(target_tables) > 1 else ""
+            for col_info in tbl["columns"]:
+                col_name = col_info["name"]
+                hyper_type = col_info["type"].upper()
+
+                # Normalize Hyper type (strip SqlType. prefix, nullable wrapper)
+                for prefix in ("SQLTYPE.", "NULLABLE(", "("):
+                    hyper_type = hyper_type.replace(prefix, "")
+                hyper_type = hyper_type.rstrip(")")
+
+                datatype, role, field_type, remote_type = self._HYPER_TYPE_MAP.get(
+                    hyper_type, ("string", "dimension", "nominal", "130")
+                )
+
+                display_name = f"{col_name}{suffix}"
+                local_name = f"[{display_name}]"
+
+                # Create <column> element on datasource
+                col_el = etree.SubElement(self._datasource, "column")
+                col_el.set("datatype", datatype)
+                col_el.set("name", local_name)
+                col_el.set("role", role)
+                col_el.set("type", field_type)
+                if suffix:
+                    col_el.set("caption", display_name)
+
+                # Create <metadata-record class="column">
+                mr = etree.SubElement(metadata_records, "metadata-record")
+                mr.set("class", "column")
+
+                remote_name_el = etree.SubElement(mr, "remote-name")
+                remote_name_el.text = col_name
+
+                remote_type_el = etree.SubElement(mr, "remote-type")
+                remote_type_el.text = remote_type
+
+                local_name_el = etree.SubElement(mr, "local-name")
+                local_name_el.text = local_name
+
+                parent_name_el = etree.SubElement(mr, "parent-name")
+                parent_name_el.text = f"[{ds_name}]"
+
+                local_type_el = etree.SubElement(mr, "local-type")
+                local_type_el.text = datatype
 
