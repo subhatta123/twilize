@@ -101,7 +101,7 @@ def generate_workbook(
 
     # Step 4: Create workbook from template
     logger.info("Creating workbook from template")
-    editor = TWBEditor()
+    editor = TWBEditor("")
 
     # Step 5: Connect to Hyper extract
     logger.info("Connecting to Hyper extract")
