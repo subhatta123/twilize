@@ -566,6 +566,120 @@ def add_dashboard_action(
 
 
 @server.tool()
+def add_reference_line(
+    worksheet_name: str,
+    axis_field: str,
+    value: str = "",
+    formula: str = "constant",
+    scope: str = "per-pane",
+    label_type: str = "automatic",
+    label: str = "",
+    line_color: str = "",
+) -> str:
+    """Add a reference line to a worksheet (constant, average, median, etc.)."""
+
+    _snapshot("add_reference_line")
+    editor = get_editor()
+    _validate_worksheet_exists(editor, worksheet_name)
+    return editor.add_reference_line(
+        worksheet_name=worksheet_name,
+        axis_field=axis_field,
+        value=float(value) if value else None,
+        formula=formula,
+        scope=scope,
+        label_type=label_type,
+        label=label,
+        line_color=line_color,
+    )
+
+
+@server.tool()
+def add_reference_band(
+    worksheet_name: str,
+    axis_field: str,
+    from_value: str = "",
+    to_value: str = "",
+    from_formula: str = "constant",
+    to_formula: str = "constant",
+    scope: str = "per-pane",
+    fill_color: str = "#E0E0E0",
+) -> str:
+    """Add a reference band (shaded region) to a worksheet."""
+
+    _snapshot("add_reference_band")
+    editor = get_editor()
+    _validate_worksheet_exists(editor, worksheet_name)
+    return editor.add_reference_band(
+        worksheet_name=worksheet_name,
+        axis_field=axis_field,
+        from_value=float(from_value) if from_value else None,
+        to_value=float(to_value) if to_value else None,
+        from_formula=from_formula,
+        to_formula=to_formula,
+        scope=scope,
+        fill_color=fill_color,
+    )
+
+
+@server.tool()
+def add_trend_line(
+    worksheet_name: str,
+    fit: str = "linear",
+    degree: int = 2,
+    show_confidence_bands: bool = False,
+    exclude_color: bool = False,
+) -> str:
+    """Add a trend line to a worksheet (linear, polynomial, log, exp, power)."""
+
+    _snapshot("add_trend_line")
+    editor = get_editor()
+    _validate_worksheet_exists(editor, worksheet_name)
+    return editor.add_trend_line(
+        worksheet_name=worksheet_name,
+        fit=fit,
+        degree=degree,
+        show_confidence_bands=show_confidence_bands,
+        exclude_color=exclude_color,
+    )
+
+
+@server.tool()
+def apply_color_palette(
+    palette_name: str = "",
+    colors: list[str] | None = None,
+    custom_name: str = "cwtwb-palette",
+) -> str:
+    """Set a custom color palette. Built-in: tableau10, tableau20, blue-red, green-gold."""
+
+    _snapshot("apply_color_palette")
+    editor = get_editor()
+    return editor.apply_color_palette(
+        palette_name=palette_name,
+        colors=colors,
+        custom_name=custom_name,
+    )
+
+
+@server.tool()
+def apply_dashboard_theme(
+    dashboard_name: str,
+    background_color: str = "",
+    font_family: str = "",
+    title_font_size: str = "",
+) -> str:
+    """Apply uniform styling (background, font) to all zones in a dashboard."""
+
+    _snapshot("apply_dashboard_theme")
+    editor = get_editor()
+    return editor.apply_dashboard_theme(
+        dashboard_name=dashboard_name,
+        background_color=background_color,
+        font_family=font_family,
+        title_font_size=title_font_size,
+    )
+
+
+@server.tool()
 def save_workbook(output_path: str) -> str:
     """Save the workbook as a TWB file. Use a .twbx extension to produce a
     packaged workbook (ZIP) that bundles the XML with any data extracts and

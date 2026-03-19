@@ -26,6 +26,9 @@ from .charts import ChartsMixin
 from .connections import ConnectionsMixin
 from .dashboards import DashboardsMixin
 from .parameters import ParametersMixin
+from .reference_lines import ReferenceLinesMixin
+from .trend_lines import TrendLineMixin
+from .themes import ThemesMixin
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +38,8 @@ _AGGREGATE_FUNCTION_RE = re.compile(
 )
 
 
-class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin):
+class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin,
+                ReferenceLinesMixin, TrendLineMixin, ThemesMixin):
     """lxml-based TWB XML editor."""
 
     def __init__(self, template_path: str | Path, clear_existing_content: bool = True):
