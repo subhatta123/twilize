@@ -44,7 +44,16 @@ from ..charts.showcase_recipes import configure_chart_recipe as configure_chart_
 from ..connections import inspect_hyper_schema
 from ..twb_editor import TWBEditor
 from .app import server
-from .state import get_editor, set_editor
+from .state import get_editor, get_snapshot_manager, set_editor
+
+
+def _snapshot(label: str) -> None:
+    """Take a snapshot of the current editor state before a mutating operation."""
+    try:
+        editor = get_editor()
+        get_snapshot_manager().take_snapshot(editor, label)
+    except RuntimeError:
+        pass  # No active editor yet — nothing to snapshot
 
 
 def _format_worksheets(editor: TWBEditor) -> str:
@@ -125,6 +134,18 @@ def list_dashboards() -> str:
 
 
 @server.tool()
+def undo_last_change() -> str:
+    """Undo the last mutating operation, restoring the previous workbook state."""
+
+    editor = get_editor()
+    mgr = get_snapshot_manager()
+    if mgr.undo_count == 0:
+        return "Nothing to undo."
+    result = mgr.rollback(editor)
+    return f"{result} ({mgr.undo_count} undo step(s) remaining)"
+
+
+@server.tool()
 def add_calculated_field(
     field_name: str,
     formula: str,
@@ -135,6 +156,7 @@ def add_calculated_field(
 ) -> str:
     """Add a calculated field to the datasource."""
 
+    _snapshot("add_calculated_field")
     editor = get_editor()
     return editor.add_calculated_field(
         field_name,
@@ -150,6 +172,7 @@ def add_calculated_field(
 def remove_calculated_field(field_name: str) -> str:
     """Remove a previously added calculated field."""
 
+    _snapshot("remove_calculated_field")
     editor = get_editor()
     return editor.remove_calculated_field(field_name)
 
@@ -168,6 +191,7 @@ def add_parameter(
 ) -> str:
     """Add a parameter to the workbook."""
 
+    _snapshot("add_parameter")
     editor = get_editor()
     return editor.add_parameter(
         name=name,
@@ -186,6 +210,7 @@ def add_parameter(
 def add_worksheet(worksheet_name: str) -> str:
     """Add a new blank worksheet to the workbook."""
 
+    _snapshot("add_worksheet")
     editor = get_editor()
     return editor.add_worksheet(worksheet_name)
 
@@ -218,6 +243,7 @@ def configure_chart(
 ) -> str:
     """Configure chart type and field mappings for a worksheet."""
 
+    _snapshot("configure_chart")
     editor = get_editor()
     return editor.configure_chart(
         worksheet_name=worksheet_name,
@@ -280,6 +306,7 @@ def configure_dual_axis(
 ) -> str:
     """Configure a dual-axis chart composition."""
 
+    _snapshot("configure_dual_axis")
     editor = get_editor()
     return editor.configure_dual_axis(
         worksheet_name=worksheet_name,
@@ -340,6 +367,7 @@ def configure_worksheet_style(
 ) -> str:
     """Apply worksheet-level styling: background color, axis/grid/border visibility."""
 
+    _snapshot("configure_worksheet_style")
     editor = get_editor()
     return editor.configure_worksheet_style(
         worksheet_name=worksheet_name,
@@ -375,6 +403,7 @@ def configure_chart_recipe(
 ) -> str:
     """Configure a showcase recipe chart through the shared recipe registry."""
 
+    _snapshot("configure_chart_recipe")
     editor = get_editor()
     return configure_chart_recipe_impl(
         editor,
@@ -395,6 +424,7 @@ def set_mysql_connection(
 ) -> str:
     """Configure the workbook datasource to use a local MySQL connection."""
 
+    _snapshot("set_mysql_connection")
     editor = get_editor()
     return editor.set_mysql_connection(
         server=server,
@@ -416,6 +446,7 @@ def set_tableauserver_connection(
 ) -> str:
     """Configure the workbook datasource to use a Tableau Server connection."""
 
+    _snapshot("set_tableauserver_connection")
     editor = get_editor()
     return editor.set_tableauserver_connection(
         server=server,
@@ -451,6 +482,7 @@ def set_hyper_connection(
 ) -> str:
     """Configure the workbook datasource to use a local Hyper extract connection."""
 
+    _snapshot("set_hyper_connection")
     editor = get_editor()
     return editor.set_hyper_connection(
         filepath=filepath,
@@ -469,6 +501,7 @@ def add_dashboard(
 ) -> str:
     """Create a dashboard combining multiple worksheets."""
 
+    _snapshot("add_dashboard")
     editor = get_editor()
     return editor.add_dashboard(
         dashboard_name=dashboard_name,
@@ -491,6 +524,7 @@ def add_dashboard_action(
 ) -> str:
     """Add an interaction action to a dashboard."""
 
+    _snapshot("add_dashboard_action")
     editor = get_editor()
     return editor.add_dashboard_action(
         dashboard_name=dashboard_name,

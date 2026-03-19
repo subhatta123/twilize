@@ -18,8 +18,10 @@ from __future__ import annotations
 from typing import Optional
 
 from ..twb_editor import TWBEditor
+from .snapshot import SessionSnapshotManager
 
 _editor: Optional[TWBEditor] = None
+_snapshot_manager: SessionSnapshotManager = SessionSnapshotManager()
 
 
 def get_editor() -> TWBEditor:
@@ -31,7 +33,14 @@ def get_editor() -> TWBEditor:
 
 
 def set_editor(editor: TWBEditor) -> None:
-    """Replace the current editor instance."""
+    """Replace the current editor instance and reset snapshots."""
 
     global _editor
     _editor = editor
+    _snapshot_manager.clear()
+
+
+def get_snapshot_manager() -> SessionSnapshotManager:
+    """Get the session snapshot manager for undo/rollback."""
+
+    return _snapshot_manager

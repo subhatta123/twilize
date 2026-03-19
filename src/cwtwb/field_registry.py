@@ -7,6 +7,7 @@ Maps user-friendly field names (e.g. Sales) to TWB internal references
 
 from __future__ import annotations
 
+import difflib
 import logging
 import re
 from dataclasses import dataclass
@@ -236,11 +237,14 @@ class FieldRegistry:
                 return v
 
         if not self.allow_unknown_fields:
+            suggestions = difflib.get_close_matches(name, self._fields.keys(), n=3, cutoff=0.5)
+            hint = f" Did you mean: {', '.join(suggestions)}?" if suggestions else ""
             examples = ", ".join(sorted(self._fields.keys())[:10])
             if len(self._fields) > 10:
                 examples += ", ..."
             raise KeyError(
-                f"Unknown field '{name}'. Register the field before use, "
+                f"Unknown field '{name}'.{hint} "
+                f"Register the field before use, "
                 f"or enable allow_unknown_fields for compatibility. "
                 f"Known fields: {examples or '(none)'}."
             )
