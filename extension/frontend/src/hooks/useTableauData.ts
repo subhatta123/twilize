@@ -20,9 +20,15 @@ export function useTableauData() {
       setRowCount(result.rowCount)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load data'
+      console.error('[cwtwb] Data load error:', msg)
       setError(msg)
-      // In development outside Tableau, provide demo fields and data
-      if (typeof tableau === 'undefined') {
+      // Fall back to demo data when not running inside Tableau's extension host.
+      // The Extensions API script defines `tableau` globally even in a browser,
+      // so we check for the dashboard content which only exists inside Tableau.
+      const insideTableau = typeof tableau !== 'undefined'
+        && tableau
+        && typeof (tableau as any).extensions?.dashboardContent?.dashboard !== 'undefined'
+      if (!insideTableau) {
         setFields([
           { name: 'Category', datatype: 'string', role: 'dimension', cardinality: 3, sample_values: ['Furniture', 'Technology', 'Office Supplies'] },
           { name: 'Region', datatype: 'string', role: 'dimension', cardinality: 4, sample_values: ['East', 'West', 'Central', 'South'] },

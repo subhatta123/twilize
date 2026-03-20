@@ -126,10 +126,18 @@ class ThemesMixin:
         changes = 0
         for zone in zones.findall(".//zone"):
             if background_color:
-                # Set zone background via format element
-                fmt = zone.find("format")
+                # Format elements must go inside <zone-style>, not directly in <zone>
+                zone_style = zone.find("zone-style")
+                if zone_style is None:
+                    zone_style = etree.SubElement(zone, "zone-style")
+                # Find or create format element for background-color
+                fmt = None
+                for existing in zone_style.findall("format"):
+                    if existing.get("attr") == "background-color":
+                        fmt = existing
+                        break
                 if fmt is None:
-                    fmt = etree.SubElement(zone, "format")
+                    fmt = etree.SubElement(zone_style, "format")
                 fmt.set("attr", "background-color")
                 fmt.set("value", background_color)
                 changes += 1
