@@ -30,7 +30,7 @@ def suggest_dashboard(
     row_count: int = 0,
     prompt: str = "",
     image_analysis: dict | None = None,
-    max_charts: int = 6,
+    max_charts: int = 5,
 ) -> dict:
     """Generate a dashboard plan from field schema and user prompt.
 
@@ -60,9 +60,15 @@ def suggest_dashboard(
     # Rule-based fallback — incorporate image analysis if available
     if image_analysis and image_analysis.get("panels"):
         suggestion = _image_guided_suggest(classified, image_analysis, max_charts)
+        result = _suggestion_to_dict(suggestion)
+        # Attach image-extracted colors for theme application
+        color_scheme = image_analysis.get("color_scheme", [])
+        if color_scheme:
+            result["theme_colors"] = color_scheme
+        return result
     else:
         suggestion = suggest_charts(classified, max_charts=max_charts)
-    return _suggestion_to_dict(suggestion)
+        return _suggestion_to_dict(suggestion)
 
 
 def _llm_suggest(
@@ -289,16 +295,36 @@ def _image_guided_suggest(
             ))
 
     layout = image_analysis.get("layout_type", "grid")
-    return DashboardSuggestion(
+
+    # Build spatial layout from panel positions
+    from .image_analysis import build_layout_from_panels
+
+    # Create placeholder worksheet names matching chart order
+    ws_names = [_safe_ws_name(c.title, i) for i, c in enumerate(charts)]
+    layout_dict = build_layout_from_panels(panels[:len(charts)], ws_names)
+
+    # Extract color scheme for theme application
+    color_scheme = image_analysis.get("color_scheme", [])
+
+    suggestion = DashboardSuggestion(
         charts=charts,
         layout=layout,
         title="Dashboard",
+        layout_dict=layout_dict,
     )
+
+    return suggestion
+
+
+def _safe_ws_name(title: str, index: int) -> str:
+    """Create a safe worksheet name for layout mapping."""
+    name = title[:50].strip()
+    return name if name else f"Sheet {index + 1}"
 
 
 def _suggestion_to_dict(suggestion: DashboardSuggestion) -> dict:
     """Convert a DashboardSuggestion to a JSON-serializable dict."""
-    return {
+    result: dict = {
         "title": suggestion.title,
         "layout": suggestion.layout,
         "charts": [
@@ -319,6 +345,11 @@ def _suggestion_to_dict(suggestion: DashboardSuggestion) -> dict:
             for c in suggestion.charts
         ],
     }
+    if suggestion.template:
+        result["template"] = suggestion.template
+    if suggestion.layout_dict:
+        result["layout_dict"] = suggestion.layout_dict
+    return result
 
 
 def dict_to_suggestion(plan: dict) -> DashboardSuggestion:
@@ -345,4 +376,6 @@ def dict_to_suggestion(plan: dict) -> DashboardSuggestion:
         charts=charts,
         layout=plan.get("layout", "grid"),
         title=plan.get("title", "Dashboard"),
+        template=plan.get("template", ""),
+        layout_dict=plan.get("layout_dict"),
     )

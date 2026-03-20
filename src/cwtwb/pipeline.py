@@ -33,10 +33,11 @@ def build_dashboard_from_csv(
     csv_path: str | Path,
     output_path: str | Path = "",
     dashboard_title: str = "",
-    max_charts: int = 6,
+    max_charts: int = 5,
     template_path: str = "",
     sample_rows: int = 1000,
     suggestion: DashboardSuggestion | None = None,
+    theme: str = "modern-light",
 ) -> str:
     """Build a complete Tableau dashboard from a CSV file.
 
@@ -136,12 +137,22 @@ def build_dashboard_from_csv(
         dashboard_title = suggestion.title or f"{csv_path.stem} Dashboard"
 
     logger.info("Creating dashboard: %s", dashboard_title)
-    layout = _build_layout(suggestion.layout, worksheet_names)
+    layout = _build_layout(suggestion, worksheet_names)
     editor.add_dashboard(
         dashboard_name=dashboard_title,
         worksheet_names=worksheet_names,
         layout=layout,
     )
+
+    # Step 8b: Apply theme
+    if theme:
+        from cwtwb.style_presets import apply_theme_to_editor
+
+        try:
+            theme_result = apply_theme_to_editor(editor, theme, dashboard_title)
+            logger.info("Theme applied: %s", theme_result)
+        except Exception as exc:
+            logger.warning("Theme application failed: %s", exc)
 
     # Step 9: Save as .twbx (bundle the Hyper extract)
     logger.info("Saving workbook to %s", output_path)
@@ -223,25 +234,33 @@ def _format_field_expression(shelf: ShelfAssignment) -> str:
     return shelf.field_name
 
 
-def _build_layout(layout_type: str, worksheet_names: list[str]) -> str | dict:
+def _build_layout(
+    suggestion: DashboardSuggestion,
+    worksheet_names: list[str],
+) -> str | dict:
     """Build a layout specification for the dashboard.
 
-    For simple layouts, returns "vertical" or "horizontal".
-    For grid layouts with many charts, builds a structured dict.
+    Uses the suggestion's template if available, otherwise falls back
+    to template selection based on chart mix, or simple layout strings.
     """
+    from cwtwb.layout_templates import TEMPLATE_NAMES, get_template
+
+    # Use explicitly set template from suggestion
+    template = suggestion.template
+    if template and template in TEMPLATE_NAMES:
+        return get_template(template, worksheet_names)
+
+    # Use layout_dict from image recognition if available
+    if suggestion.layout_dict:
+        return suggestion.layout_dict
+
+    # Auto-select template based on chart mix
+    has_kpi = any(c.chart_type == "Text" for c in suggestion.charts)
     n = len(worksheet_names)
 
-    if layout_type in ("vertical", "horizontal") or n <= 2:
-        return layout_type
-
-    # Grid layout: arrange in rows of 2-3
-    cols_per_row = 2 if n <= 4 else 3
-    rows_list = []
-    for i in range(0, n, cols_per_row):
-        row_sheets = worksheet_names[i : i + cols_per_row]
-        if len(row_sheets) == 1:
-            rows_list.append(row_sheets[0])
-        else:
-            rows_list.append({"direction": "horizontal", "items": row_sheets})
-
-    return {"direction": "vertical", "items": rows_list}
+    if has_kpi and n >= 3:
+        return get_template("executive-summary", worksheet_names)
+    elif n <= 3:
+        return get_template("overview", worksheet_names)
+    else:
+        return get_template("grid", worksheet_names)

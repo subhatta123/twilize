@@ -33,7 +33,7 @@ class SuggestRequest(BaseModel):
     fields: list[dict]
     prompt: str = ""
     row_count: int = 0
-    max_charts: int = 6
+    max_charts: int = 5
     image_base64: str = ""
 
 

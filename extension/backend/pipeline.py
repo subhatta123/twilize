@@ -138,12 +138,30 @@ def generate_workbook(
     # Step 7: Create dashboard
     title = plan.get("title", "Extension Dashboard")
     logger.info("Creating dashboard: %s", title)
-    layout = _build_layout(suggestion.layout, worksheet_names)
+    layout = _build_layout(suggestion, worksheet_names)
     editor.add_dashboard(
         dashboard_name=title,
         worksheet_names=worksheet_names,
         layout=layout,
     )
+
+    # Step 7b: Apply theme
+    theme_name = plan.get("theme", "modern-light")
+    theme_colors = plan.get("theme_colors")
+    try:
+        from cwtwb.style_presets import apply_theme_to_editor
+
+        if theme_colors:
+            result = apply_theme_to_editor(
+                editor, "custom", title, custom_colors=theme_colors
+            )
+        elif theme_name:
+            result = apply_theme_to_editor(editor, theme_name, title)
+        else:
+            result = apply_theme_to_editor(editor, "modern-light", title)
+        logger.info("Theme applied: %s", result)
+    except Exception as exc:
+        logger.warning("Theme application failed: %s", exc)
 
     # Step 8: Save as .twbx
     safe_title = re.sub(r'[<>:"/\\|?*]', '', title).replace(' ', '_').strip('_') or "Dashboard"

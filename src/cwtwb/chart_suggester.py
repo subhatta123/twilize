@@ -42,9 +42,11 @@ class DashboardSuggestion:
     charts: list[ChartSuggestion] = field(default_factory=list)
     layout: str = "grid"  # "grid", "vertical", "horizontal"
     title: str = ""
+    template: str = ""  # Named layout template (e.g., "executive-summary", "overview")
+    layout_dict: dict | None = field(default=None)  # Custom FlexNode layout from image
 
 
-def suggest_charts(schema: ClassifiedSchema, max_charts: int = 6) -> DashboardSuggestion:
+def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSuggestion:
     """Suggest charts based on the classified schema.
 
     Uses rule-based heuristics to pick chart types that best represent
@@ -147,7 +149,7 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 6) -> DashboardSu
         ))
 
     # --- Categorical dim (few values) + Measure → Pie chart ---
-    small_cat = [d for d in cat_dims if d.spec.cardinality <= 8]
+    small_cat = [d for d in cat_dims if d.spec.cardinality <= 6]
     if small_cat and measures:
         dim = small_cat[0]
         m = measures[0]
@@ -227,21 +229,67 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 6) -> DashboardSu
 
     # Sort by priority and trim
     suggestions.sort(key=lambda s: s.priority, reverse=True)
-    suggestions = suggestions[:max_charts]
+
+    # --- Best practice: temporal guard ---
+    # If a Line chart uses a temporal dim, remove Bar charts using the same dim
+    temporal_dims_in_lines = set()
+    for s in suggestions:
+        if s.chart_type == "Line":
+            for sh in s.shelves:
+                if sh.shelf == "columns" and not sh.aggregation:
+                    temporal_dims_in_lines.add(sh.field_name)
+    if temporal_dims_in_lines:
+        suggestions = [
+            s for s in suggestions
+            if not (s.chart_type == "Bar" and any(
+                sh.field_name in temporal_dims_in_lines
+                for sh in s.shelves if sh.shelf in ("columns", "rows") and not sh.aggregation
+            ))
+        ]
+
+    # --- Best practice: deduplicate chart types ---
+    # Allow max 2 of the same type, and only if primary axis fields differ
+    deduped: list[ChartSuggestion] = []
+    type_count: dict[str, int] = {}
+    type_fields: dict[str, list[set[str]]] = {}
+    for s in suggestions:
+        ct = s.chart_type
+        primary_fields = {sh.field_name for sh in s.shelves if sh.shelf in ("columns", "rows")}
+        if ct not in type_count:
+            type_count[ct] = 0
+            type_fields[ct] = []
+        if type_count[ct] >= 2:
+            continue
+        # Skip if same primary fields already exist for this type
+        if any(primary_fields == existing for existing in type_fields[ct]):
+            continue
+        type_count[ct] += 1
+        type_fields[ct].append(primary_fields)
+        deduped.append(s)
+    suggestions = deduped[:max_charts]
 
     # Determine layout
     n = len(suggestions)
     if n <= 2:
         layout = "horizontal"
-    elif n <= 4:
-        layout = "grid"
     else:
         layout = "grid"
+
+    # Select template based on chart mix
+    has_kpi = any(s.chart_type == "Text" for s in suggestions)
+    template = ""
+    if has_kpi:
+        template = "executive-summary"
+    elif n <= 3:
+        template = "overview"
+    else:
+        template = "grid"
 
     return DashboardSuggestion(
         charts=suggestions,
         layout=layout,
         title=_derive_title(schema),
+        template=template,
     )
 
 
@@ -259,6 +307,21 @@ def format_suggestions(suggestion: DashboardSuggestion) -> str:
         lines.append("")
 
     return "\n".join(lines)
+
+
+_COUNT_KEYWORDS = {"count", "quantity", "number", "num_", "qty", "n_", "total_count"}
+
+
+def _default_aggregation(field_name: str) -> str:
+    """Return the best default aggregation for a measure field.
+
+    Count-like fields get COUNT; everything else gets SUM.
+    """
+    lower = field_name.lower()
+    for kw in _COUNT_KEYWORDS:
+        if kw in lower:
+            return "COUNT"
+    return "SUM"
 
 
 def _best_categorical_dim(dims: list[ClassifiedColumn]) -> ClassifiedColumn:

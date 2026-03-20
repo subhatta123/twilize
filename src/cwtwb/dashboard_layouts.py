@@ -19,6 +19,12 @@ def resolve_dashboard_layout(
     if isinstance(layout, dict):
         return layout
 
+    # Check if the string matches a named layout template
+    from .layout_templates import TEMPLATE_NAMES, get_template
+
+    if layout in TEMPLATE_NAMES:
+        return get_template(layout, worksheet_names)
+
     layout_path = Path(layout)
     if layout_path.exists() and layout_path.is_file():
         with open(layout_path, "r", encoding="utf-8") as f:

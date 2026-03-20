@@ -63,22 +63,116 @@ def analyze_reference_image(
     }
 
 
-_VISION_PROMPT = """Analyze this dashboard screenshot. Extract:
-1. Layout structure (grid, vertical, horizontal, mixed)
-2. For each panel/chart: position (row, col), chart type (bar, line, pie, scatter, map, heatmap, text/KPI, area, treemap)
-3. Color scheme (list of hex colors if visible)
-4. Any notable design patterns
+_VISION_PROMPT = """Analyze this dashboard screenshot carefully. Extract the exact spatial layout and chart structure.
+
+For each chart panel, identify:
+1. Its position in the grid (row and column, 0-indexed)
+2. Its approximate width and height as fractions of the total dashboard (0.0 to 1.0)
+3. The chart type (bar, line, pie, scatter, map, heatmap, text/KPI, area, treemap)
+4. A brief description of what data it likely shows
+
+Also extract:
+- Overall layout structure (grid, vertical, horizontal, mixed)
+- Color scheme (list of hex colors used for data encoding, not background)
+- Background color of the dashboard (hex)
+- Font style observations (serif/sans-serif, approximate heading size)
 
 Respond with JSON only:
 {
   "layout_type": "grid",
   "panels": [
-    {"row": 0, "col": 0, "chart_type": "bar", "description": "Sales by category"},
-    {"row": 0, "col": 1, "chart_type": "line", "description": "Revenue trend"}
+    {"row": 0, "col": 0, "width_pct": 0.5, "height_pct": 0.5, "chart_type": "bar", "description": "Sales by category"},
+    {"row": 0, "col": 1, "width_pct": 0.5, "height_pct": 0.5, "chart_type": "line", "description": "Revenue trend"}
   ],
   "color_scheme": ["#4E79A7", "#F28E2B"],
+  "background_color": "#FFFFFF",
+  "font_style": "sans-serif",
   "notes": "Any additional observations"
 }"""
+
+
+def build_layout_from_panels(
+    panels: list[dict],
+    worksheet_names: list[str],
+) -> dict:
+    """Convert image analysis panels into a FlexNode-compatible layout dict.
+
+    Groups panels by row, creates horizontal containers for each row,
+    and stacks rows vertically. Uses width_pct/height_pct for weights.
+
+    Args:
+        panels: Panel dicts from image analysis with row, col, width_pct, height_pct.
+        worksheet_names: Actual worksheet names to map to panel slots.
+
+    Returns:
+        Layout dict consumable by resolve_dashboard_layout().
+    """
+    if not panels or not worksheet_names:
+        return {
+            "type": "container",
+            "direction": "vertical",
+            "children": [{"type": "worksheet", "name": n, "weight": 1} for n in worksheet_names],
+        }
+
+    # Group panels by row
+    rows_map: dict[int, list[dict]] = {}
+    for panel in panels:
+        row = panel.get("row", 0)
+        rows_map.setdefault(row, []).append(panel)
+
+    # Sort each row's panels by column
+    for row_panels in rows_map.values():
+        row_panels.sort(key=lambda p: p.get("col", 0))
+
+    # Build layout: stack rows vertically
+    row_children: list[dict] = []
+    ws_idx = 0
+
+    for row_num in sorted(rows_map.keys()):
+        row_panels = rows_map[row_num]
+
+        # Calculate row weight from average height_pct
+        row_height = sum(p.get("height_pct", 0.5) for p in row_panels) / len(row_panels)
+        row_weight = max(1, round(row_height * 10))
+
+        if len(row_panels) == 1 and ws_idx < len(worksheet_names):
+            # Single panel in row
+            p = row_panels[0]
+            row_children.append({
+                "type": "worksheet",
+                "name": worksheet_names[ws_idx],
+                "weight": row_weight,
+            })
+            ws_idx += 1
+        else:
+            # Multiple panels in row → horizontal container
+            col_children: list[dict] = []
+            for p in row_panels:
+                if ws_idx >= len(worksheet_names):
+                    break
+                col_weight = max(1, round(p.get("width_pct", 0.5) * 10))
+                col_children.append({
+                    "type": "worksheet",
+                    "name": worksheet_names[ws_idx],
+                    "weight": col_weight,
+                })
+                ws_idx += 1
+
+            if col_children:
+                row_children.append({
+                    "type": "container",
+                    "direction": "horizontal",
+                    "weight": row_weight,
+                    "children": col_children,
+                })
+
+    # If there are remaining worksheets not mapped to panels, append them
+    if ws_idx < len(worksheet_names):
+        remaining = worksheet_names[ws_idx:]
+        for name in remaining:
+            row_children.append({"type": "worksheet", "name": name, "weight": 1})
+
+    return {"type": "container", "direction": "vertical", "children": row_children}
 
 
 def _analyze_with_anthropic(image_base64: str, api_key: str) -> dict:
