@@ -32,10 +32,14 @@ declare const tableau: {
 }
 
 export async function initTableauExtension(): Promise<void> {
-  if (typeof tableau === 'undefined') {
-    throw new Error('Tableau Extensions API not available')
+  if (typeof tableau === 'undefined' || !tableau) {
+    throw new Error('Tableau Extensions API not available — not running inside Tableau Desktop')
   }
-  await tableau.extensions.initializeAsync()
+  const t = tableau as any
+  if (!t.extensions || typeof t.extensions.initializeAsync !== 'function') {
+    throw new Error('Tableau Extensions API object found but initializeAsync is missing')
+  }
+  await t.extensions.initializeAsync()
 }
 
 export async function extractTableauData(): Promise<{
