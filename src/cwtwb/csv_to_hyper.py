@@ -385,20 +385,24 @@ def csv_to_hyper(
                                 typed_row.append(None)
                                 continue
                             val = row[i].strip()
-                            if val == "" or val.lower() in ("null", "na", "n/a", "nan", "none"):
+                            if val == "" or val.lower() in ("null", "na", "n/a", "nan", "none", "%null%"):
                                 typed_row.append(None)
                             elif col.inferred_type == "integer":
-                                typed_row.append(int(val.replace(",", "")))
+                                try:
+                                    typed_row.append(int(val.replace(",", "")))
+                                except (ValueError, OverflowError):
+                                    typed_row.append(None)
                             elif col.inferred_type == "float":
-                                cleaned = val.replace(",", "").replace("$", "").replace("%", "")
-                                # Handle parenthesized negatives like (100.00)
-                                if cleaned.startswith("(") and cleaned.endswith(")"):
-                                    cleaned = "-" + cleaned[1:-1]
-                                typed_row.append(float(cleaned))
+                                try:
+                                    cleaned = val.replace(",", "").replace("$", "").replace("%", "")
+                                    if cleaned.startswith("(") and cleaned.endswith(")"):
+                                        cleaned = "-" + cleaned[1:-1]
+                                    typed_row.append(float(cleaned))
+                                except (ValueError, OverflowError):
+                                    typed_row.append(None)
                             elif col.inferred_type == "boolean":
                                 typed_row.append(val.lower() in ("true", "yes", "1", "t", "y"))
                             elif col.inferred_type == "date":
-                                # Try date formats
                                 parsed = None
                                 for fmt in _DATE_FORMATS:
                                     try:
