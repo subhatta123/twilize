@@ -181,14 +181,14 @@ class FieldRegistry:
         # "YEAR(Order Date)" that are actual column names, not aggregations)
         try:
             fi = self._find_field(field_name)
-        except KeyError:
+        except KeyError as e1:
             if m:
                 # The full expr might be a literal field name
                 try:
                     fi = self._find_field(expr.strip())
                     derivation = "None"  # Not an aggregation — literal name
                 except KeyError:
-                    raise  # Re-raise original error
+                    raise e1 from None  # Re-raise FIRST error (more helpful)
             else:
                 raise
 

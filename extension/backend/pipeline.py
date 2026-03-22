@@ -231,6 +231,7 @@ def generate_workbook(
 
         if auto_filters:
             chart_kwargs["filters"] = auto_filters
+        print(f"[PIPELINE]   kwargs: {chart_kwargs}")
         try:
             editor.configure_chart(ws_name, **chart_kwargs)
             configured_ok.add(ws_name)
