@@ -1,9 +1,9 @@
-"""Shared pytest fixtures for cwtwb tests."""
+"""Shared pytest fixtures for twilize tests."""
 
 import pytest
 from pathlib import Path
 
-from cwtwb.twb_editor import TWBEditor
+from twilize.twb_editor import TWBEditor
 
 
 @pytest.fixture

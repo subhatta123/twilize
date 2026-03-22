@@ -6,18 +6,18 @@ and end-to-end dashboard generation as MCP tools.
 
 from __future__ import annotations
 
-from cwtwb.chart_suggester import format_suggestions, suggest_charts
-from cwtwb.csv_to_hyper import (
+from twilize.chart_suggester import format_suggestions, suggest_charts
+from twilize.csv_to_hyper import (
     classify_columns,
     csv_to_hyper as _csv_to_hyper_impl,
     format_schema_summary,
     infer_csv_schema,
 )
-from cwtwb.mcp.app import server
-from cwtwb.mcp.state import get_editor, set_editor
-from cwtwb.mcp.tools_workbook import _snapshot
-from cwtwb.pipeline import build_dashboard_from_csv
-from cwtwb.twb_editor import TWBEditor
+from twilize.mcp.app import server
+from twilize.mcp.state import get_editor, set_editor
+from twilize.mcp.tools_workbook import _snapshot
+from twilize.pipeline import build_dashboard_from_csv
+from twilize.twb_editor import TWBEditor
 
 
 @server.tool()

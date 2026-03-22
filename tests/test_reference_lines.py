@@ -7,14 +7,14 @@ from pathlib import Path
 import pytest
 from lxml import etree
 
-from cwtwb.server import (
+from twilize.server import (
     add_worksheet,
     configure_chart,
     create_workbook,
     add_dashboard,
 )
-from cwtwb.mcp.state import get_editor
-from cwtwb.mcp.tools_workbook import (
+from twilize.mcp.state import get_editor
+from twilize.mcp.tools_workbook import (
     add_reference_line,
     add_reference_band,
     add_trend_line,

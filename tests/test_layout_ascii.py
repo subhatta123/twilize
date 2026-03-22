@@ -3,8 +3,8 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
-from cwtwb.server import generate_layout_json
-from cwtwb.twb_editor import TWBEditor
+from twilize.server import generate_layout_json
+from twilize.twb_editor import TWBEditor
 
 def test_new_layout_flow():
     project_root = Path(__file__).parent.parent

@@ -7,8 +7,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from cwtwb import TWBEditor  # noqa: E402
-from cwtwb.server import (  # noqa: E402
+from twilize import TWBEditor  # noqa: E402
+from twilize.server import (  # noqa: E402
     add_calculated_field,
     add_dashboard,
     add_dashboard_action,

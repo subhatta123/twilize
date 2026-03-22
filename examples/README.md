@@ -1,9 +1,9 @@
-# cwtwb SDK — Examples
+# twilize SDK — Examples
 
 Run the hello-world example in under a minute:
 
 ```bash
-pip install cwtwb
+pip install twilize
 python examples/scripts/demo_e2e_mcp_workflow.py
 ```
 
@@ -23,7 +23,7 @@ Seven runnable Python scripts, ordered from beginner to advanced.
 | 4 | `scripts/demo_declarative_layout.py` | ⭐⭐⭐ Advanced | 8 worksheets assembled into 3 dashboards driven by external JSON layout files in `layouts/`. |
 | 5 | `scripts/demo_all_supported_charts_mcp.py` | ⭐⭐⭐ Advanced | All 15 chart types via **MCP tool functions** — the same path an LLM follows at runtime. |
 | 6 | `scripts/demo_all_supported_charts.py` | ⭐⭐⭐ Advanced | Same 15-chart showcase using the **direct `TWBEditor` Python API**. Good for SDK regression testing. |
-| 7 | `scripts/demo_hyper_and_new_charts.py` | ⭐⭐⭐ Advanced | Scatterplot · Heatmap · Tree Map · Bubble Chart in a 2×2 grid, optionally against a Hyper extract. Needs `pip install "cwtwb[examples]"`. |
+| 7 | `scripts/demo_hyper_and_new_charts.py` | ⭐⭐⭐ Advanced | Scatterplot · Heatmap · Tree Map · Bubble Chart in a 2×2 grid, optionally against a Hyper extract. Needs `pip install "twilize[examples]"`. |
 
 Run any script from the project root:
 
@@ -36,7 +36,7 @@ python examples/scripts/demo_all_supported_charts.py
 
 ## Prompts — for MCP / LLM Clients
 
-Copy these into any LLM client (Claude, etc.) with the `cwtwb` MCP server configured.
+Copy these into any LLM client (Claude, etc.) with the `twilize` MCP server configured.
 
 | Step | Prompt file | Level | What it demonstrates |
 |------|-------------|-------|----------------------|

@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
-from cwtwb import migrate_twb_guided  # noqa: E402
+from twilize import migrate_twb_guided  # noqa: E402
 
 
 EXAMPLE_DIR = Path(__file__).resolve().parent

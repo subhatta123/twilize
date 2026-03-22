@@ -1,4 +1,4 @@
-"""FastAPI server for the cwtwb Tableau Dashboard Extension.
+"""FastAPI server for the twilize Tableau Dashboard Extension.
 
 Endpoints:
     POST /api/suggest  — receive schema + prompt + optional image → dashboard plan
@@ -67,7 +67,7 @@ class GenerateRequest(BaseModel):
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="cwtwb Dashboard Extension",
+    title="twilize Dashboard Extension",
     description="Generate Tableau dashboards from connected data",
     version="0.1.0",
 )

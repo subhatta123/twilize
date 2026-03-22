@@ -1,4 +1,4 @@
-"""Compatibility entrypoint for cwtwb's MCP server."""
+"""Compatibility entrypoint for twilize's MCP server."""
 
 from .mcp.app import server
 from .mcp.resources import read_skill, read_skills_index, read_tableau_functions

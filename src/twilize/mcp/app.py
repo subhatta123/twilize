@@ -1,11 +1,11 @@
-"""FastMCP server singleton for the cwtwb MCP server.
+"""FastMCP server singleton for the twilize MCP server.
 
 This module creates the single FastMCP `server` instance that all tool and
 resource modules register against via @server.tool() and @server.resource().
 
 Import order matters: app.py must be imported before tools_*.py and resources.py
 so that `server` exists when the decorators run.  The entry point (typically
-run via `mcp run` or `python -m cwtwb.mcp`) imports all tool modules, which
+run via `mcp run` or `python -m twilize.mcp`) imports all tool modules, which
 self-register, and then starts the server transport.
 
 The `instructions` string is what AI agents read when they first connect —
@@ -16,12 +16,12 @@ from mcp.server.fastmcp import FastMCP
 
 
 server = FastMCP(
-    "cwtwb",
+    "twilize",
     instructions="Tableau Workbook (.twb) generation MCP Server. "
     "Create visualizations by calling create_workbook or open_workbook first, "
     "then add_worksheet + configure_chart, and finally save_workbook. "
     "Prefer core primitives first, and use list_capabilities or describe_capability "
     "when you need to check whether a chart or feature is core, advanced, or recipe-only. "
     "For professional-quality output, read the agent skills "
-    "(cwtwb://skills/index) before starting each phase.",
+    "(twilize://skills/index) before starting each phase.",
 )

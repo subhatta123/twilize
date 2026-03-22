@@ -1,6 +1,6 @@
 """Capability catalog and workbook analysis MCP tools.
 
-These tools help an AI agent understand what cwtwb can and cannot do before
+These tools help an AI agent understand what twilize can and cannot do before
 attempting to build or migrate a workbook.
 
 TOOL INVENTORY
@@ -19,7 +19,7 @@ TOOL INVENTORY
       Parse an existing .twb file and report:
         - Which chart types and encodings it uses.
         - Which capabilities are core, advanced, recipe-level, or unsupported.
-        - The full capability gap section (features used that cwtwb cannot yet
+        - The full capability gap section (features used that twilize cannot yet
           reproduce automatically).
       Combines twb_analyzer.to_text() + to_gap_text() in one call.
 
@@ -46,7 +46,7 @@ from .state import get_editor
 
 @server.tool()
 def list_capabilities() -> str:
-    """List cwtwb's declared capability boundary."""
+    """List twilize's declared capability boundary."""
 
     return format_capability_catalog()
 
@@ -60,7 +60,7 @@ def describe_capability(kind: str, name: str) -> str:
 
 @server.tool()
 def analyze_twb(file_path: str) -> str:
-    """Analyze a TWB file against cwtwb's declared capabilities."""
+    """Analyze a TWB file against twilize's declared capabilities."""
 
     report = analyze_workbook(file_path)
     return report.to_text() + "\n\n" + report.to_gap_text()

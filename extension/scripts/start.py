@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Launch the cwtwb Dashboard Extension server.
+"""Launch the twilize Dashboard Extension server.
 
 Usage:
     python extension/scripts/start.py          # Production (serves built frontend)
@@ -16,7 +16,7 @@ from pathlib import Path
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Start cwtwb Dashboard Extension")
+    parser = argparse.ArgumentParser(description="Start twilize Dashboard Extension")
     parser.add_argument("--dev", action="store_true", help="Run in development mode")
     parser.add_argument("--port", type=int, default=8000, help="Backend port")
     parser.add_argument("--host", default="0.0.0.0", help="Backend host")

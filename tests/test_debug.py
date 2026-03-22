@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from cwtwb.twb_editor import TWBEditor
+from twilize.twb_editor import TWBEditor
 
 
 def test_bar_only():

@@ -1,6 +1,6 @@
 ---
 name: Calculation Builder
-description: Expert guidance for creating Tableau calculated fields, parameters, and LOD expressions via cwtwb.
+description: Expert guidance for creating Tableau calculated fields, parameters, and LOD expressions via twilize.
 phase: 1
 prerequisites: create_workbook must be called first
 ---

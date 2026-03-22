@@ -8,17 +8,17 @@ from pathlib import Path
 
 import pytest
 
-from cwtwb.server import (
+from twilize.server import (
     add_worksheet,
     configure_chart,
     create_workbook,
     save_workbook,
 )
-from cwtwb.mcp.state import get_editor, get_snapshot_manager, set_editor
-from cwtwb.mcp.tools_workbook import undo_last_change
-from cwtwb.field_registry import FieldRegistry
-from cwtwb.validator import validate_editor_state
-from cwtwb.charts.dispatcher import configure_chart as dispatch_configure_chart
+from twilize.mcp.state import get_editor, get_snapshot_manager, set_editor
+from twilize.mcp.tools_workbook import undo_last_change
+from twilize.field_registry import FieldRegistry
+from twilize.validator import validate_editor_state
+from twilize.charts.dispatcher import configure_chart as dispatch_configure_chart
 
 TEMPLATE = Path("templates/twb/superstore.twb")
 

@@ -7,12 +7,12 @@ requires: "examples/layouts/layout_executive.json, examples/layouts/layout_c2.js
 
 # Declarative JSON Dashboard Layout - Natural language MCP Prompt
 
-You can use the following conversational prompt with any LLM connected to the `cwtwb` MCP server to achieve the same results without hardcoding long JSON payloads.
+You can use the following conversational prompt with any LLM connected to the `twilize` MCP server to achieve the same results without hardcoding long JSON payloads.
 
 ## The Prompt
 
 ```text
-Hi! I want to build an Executive Dashboard related to sales using the cwtwb tool.
+Hi! I want to build an Executive Dashboard related to sales using the twilize tool.
 
 
 First, I need 8 worksheets in total. Four of them are detail charts:

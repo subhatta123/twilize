@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from cwtwb.csv_to_hyper import (
+from twilize.csv_to_hyper import (
     ClassifiedSchema,
     CsvSchema,
     classify_columns,

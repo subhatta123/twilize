@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from cwtwb.server import (
+from twilize.server import (
     add_dashboard,
     add_worksheet,
     configure_chart,

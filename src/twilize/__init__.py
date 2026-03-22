@@ -1,9 +1,9 @@
-"""cwtwb - Tableau Workbook (.twb) Generation MCP Server"""
+"""twilize - Tableau Workbook (.twb) Generation MCP Server"""
 
 from importlib.metadata import PackageNotFoundError, version
 
 try:
-    __version__ = version("cwtwb")
+    __version__ = version("twilize")
 except PackageNotFoundError:
     __version__ = "0.0.0-dev"
 

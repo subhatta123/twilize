@@ -1,11 +1,11 @@
-# cwtwb
+# twilize
 
 > **Tableau Workbook (.twb/.twbx) generation toolkit for reproducible dashboards and workbook engineering**
 > Programmatically create Tableau workbooks with stable analytical primitives, dashboard composition, and built-in structural validation.
 
 ## Overview
 
-**cwtwb** is a Model Context Protocol (MCP) server and Python toolkit for generating Tableau Desktop workbook files (`.twb` / `.twbx`) from code or AI-driven tool calls.
+**twilize** is a Model Context Protocol (MCP) server and Python toolkit for generating Tableau Desktop workbook files (`.twb` / `.twbx`) from code or AI-driven tool calls.
 
 It is designed as a **workbook engineering layer**, not as a conversational data exploration agent. The goal is to make workbook generation reproducible, inspectable, and safe to automate in local workflows, scripts, and CI.
 
@@ -22,7 +22,7 @@ The default workflow is:
   ┌───────────────────────────────────────────────────────────────┐
   │  ┌──────────────────────────┐  ┌───────────────────────────┐  │
   │  │        MCP Server        │  │      Python Library       │  │
-  │  │  tools_workbook          │  │  from cwtwb.twb_editor    │  │
+  │  │  tools_workbook          │  │  from twilize.twb_editor    │  │
   │  │  tools_layout            │  │  import TWBEditor         │  │
   │  │  tools_migration         │  │                           │  │
   │  │  tools_support           │  │  editor.add_...()         │  │
@@ -60,7 +60,7 @@ The default workflow is:
 ## Installation
 
 ```bash
-pip install cwtwb
+pip install twilize
 ```
 
 To run the bundled Hyper-backed example that inspects `.hyper` files and
@@ -68,7 +68,7 @@ resolves the physical `Orders_*` table automatically, install the optional
 example dependency as well:
 
 ```bash
-pip install "cwtwb[examples]"
+pip install "twilize[examples]"
 ```
 
 ### Requirements
@@ -82,13 +82,13 @@ pip install "cwtwb[examples]"
 
 ### As MCP Server
 
-To allow an MCP client to build Tableau workbooks automatically, add `cwtwb`
+To allow an MCP client to build Tableau workbooks automatically, add `twilize`
 to that client's MCP configuration.
 
 The launch command is the same across clients:
 
 ```bash
-uvx cwtwb
+uvx twilize
 ```
 
 Each client stores this command in a different configuration format. Use the
@@ -101,9 +101,9 @@ Open `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS 
 ```json
 {
   "mcpServers": {
-    "cwtwb": {
+    "twilize": {
       "command": "uvx",
-      "args": ["cwtwb"]
+      "args": ["twilize"]
     }
   }
 }
@@ -114,13 +114,13 @@ Open `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS 
 1. Open **Cursor Settings** -> **Features** -> **MCP**
 2. Click **Add New MCP Server**
 3. Set **Type** to `command`
-4. Set **Name** to `cwtwb`
-5. Set **Command** to `uvx cwtwb`
+4. Set **Name** to `twilize`
+5. Set **Command** to `uvx twilize`
 
 #### Claude Code
 
 ```bash
-claude mcp add cwtwb -- uvx cwtwb
+claude mcp add twilize -- uvx twilize
 ```
 
 #### VSCode
@@ -131,9 +131,9 @@ file and add:
 ```json
 {
   "servers": {
-    "cwtwb": {
+    "twilize": {
       "command": "uvx",
-      "args": ["cwtwb"]
+      "args": ["twilize"]
     }
   }
 }
@@ -142,7 +142,7 @@ file and add:
 In VSCode, you can open these files from the Command Palette with
 **MCP: Open Workspace Folder Configuration** or
 **MCP: Open User Configuration**. You can also use **MCP: Add Server** and
-enter the same `uvx cwtwb` command through the guided flow.
+enter the same `uvx twilize` command through the guided flow.
 
 ### As Python Library
 
@@ -151,7 +151,7 @@ Use `TWBEditor.open_existing(...)` when you want to keep existing worksheets
 and dashboards and reconfigure a sheet in place.
 
 ```python
-from cwtwb.twb_editor import TWBEditor
+from twilize.twb_editor import TWBEditor
 
 editor = TWBEditor("")  # "" uses the built-in Superstore template
 editor.clear_worksheets()
@@ -184,10 +184,10 @@ editor.save("output/my_workbook.twb")
 
 ### Working with Packaged Workbooks (.twbx)
 
-`.twbx` files are ZIP archives that bundle the workbook XML together with data extracts (`.hyper`) and image assets. cwtwb reads and writes them transparently:
+`.twbx` files are ZIP archives that bundle the workbook XML together with data extracts (`.hyper`) and image assets. twilize reads and writes them transparently:
 
 ```python
-from cwtwb.twb_editor import TWBEditor
+from twilize.twb_editor import TWBEditor
 
 # Open a packaged workbook — extracts and images are preserved automatically
 editor = TWBEditor.open_existing("templates/dashboard/MyDashboard.twbx")
@@ -230,7 +230,7 @@ editor.save("output/superstore.twbx")  # produces a single-entry ZIP with the .t
 | `add_dashboard` | Create a dashboard combining worksheets |
 | `add_dashboard_action` | Add filter or highlight actions to a dashboard |
 | `generate_layout_json` | Build an interactive structured dashboard flexbox layout |
-| `list_capabilities` | Show cwtwb's declared support boundary |
+| `list_capabilities` | Show twilize's declared support boundary |
 | `describe_capability` | Explain whether a chart or feature is core, advanced, recipe, or unsupported |
 | `analyze_twb` | Analyze a `.twb` file against the capability catalog; output includes both the full capability breakdown and the capability gap triage summary |
 | `diff_template_gap` | Summarize the non-core gap of a template |
@@ -291,7 +291,7 @@ Recipe charts are intentionally exposed through a single `configure_chart_recipe
 tool so the public MCP surface does not grow one tool at a time for every
 showcase pattern.
 
-This distinction matters because `cwtwb` is not trying to become a chart zoo or compete with Tableau's own conversational analysis tooling. The project is strongest when it provides a reliable, automatable workbook generation layer.
+This distinction matters because `twilize` is not trying to become a chart zoo or compete with Tableau's own conversational analysis tooling. The project is strongest when it provides a reliable, automatable workbook generation layer.
 
 ### Capability-first workflow
 
@@ -353,13 +353,13 @@ Custom layouts can be built programmatically using a nested `layout` dictionary 
 ## Hyper-backed Example
 
 The `examples/hyper_and_new_charts.py` example uses the `Sample - EU Superstore.hyper`
-extract bundled directly in the package (`src/cwtwb/references/`) and resolves the
+extract bundled directly in the package (`src/twilize/references/`) and resolves the
 physical `Orders_*` table via Tableau Hyper API before switching the workbook connection.
-No repository clone is needed — install with `pip install "cwtwb[examples]"` and run directly.
+No repository clone is needed — install with `pip install "twilize[examples]"` and run directly.
 
 ## Workbook Migration
 
-cwtwb includes a migration subsystem for switching an existing `.twb` to a new
+twilize includes a migration subsystem for switching an existing `.twb` to a new
 datasource — for example, repointing a workbook built on one Excel file to a
 different Excel with a different schema, or migrating between language variants
 of the same dataset.
@@ -384,7 +384,7 @@ a `warning_review_bundle` for human review before proceeding.
 ### Python example
 
 ```python
-from cwtwb.migration import migrate_twb_guided_json
+from twilize.migration import migrate_twb_guided_json
 import json
 
 # One-call guided migration
@@ -409,7 +409,7 @@ if bundle["status"] == "warning_review_required":
 
 ### MCP tool example
 
-When using cwtwb as an MCP server, an AI agent can run the full workflow:
+When using twilize as an MCP server, an AI agent can run the full workflow:
 
 ```
 inspect_target_schema(target_source="data/new_data_source.xlsx")
@@ -451,8 +451,8 @@ python examples/migrate_workflow/test_migration_workflow.py
 ## Project Structure
 
 ```text
-cwtwb/
-|-- src/cwtwb/
+twilize/
+|-- src/twilize/
 |   |-- __init__.py
 |   |-- capability_registry.py
 |   |-- config.py
@@ -498,7 +498,7 @@ python examples/scripts/demo_hyper_and_new_charts.py
 python examples/migrate_workflow/test_migration_workflow.py
 
 # Start MCP server
-cwtwb
+twilize
 ```
 
 ## License

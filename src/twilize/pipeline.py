@@ -11,25 +11,25 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
-from cwtwb.chart_suggester import (
+from twilize.chart_suggester import (
     ChartSuggestion,
     DashboardSuggestion,
     ShelfAssignment,
     suggest_charts,
 )
-from cwtwb.csv_to_hyper import (
+from twilize.csv_to_hyper import (
     ClassifiedSchema,
     CsvSchema,
     classify_columns,
     csv_to_hyper,
     infer_csv_schema,
 )
-from cwtwb.dashboard_enhancements import (
+from twilize.dashboard_enhancements import (
     auto_add_actions,
     select_auto_filters,
     validate_suggestion,
 )
-from cwtwb.twb_editor import TWBEditor
+from twilize.twb_editor import TWBEditor
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +101,7 @@ def build_dashboard_from_csv(
     auto_filters = select_auto_filters(classified, max_filters=3)
 
     # Step 4: Create Hyper extract
-    hyper_dir = tempfile.mkdtemp(prefix="cwtwb_pipeline_")
+    hyper_dir = tempfile.mkdtemp(prefix="twilize_pipeline_")
     hyper_path = Path(hyper_dir) / f"{csv_path.stem}.hyper"
     logger.info("Creating Hyper extract at %s", hyper_path)
     csv_to_hyper(csv_path, hyper_path, schema=raw_schema, table_name="Extract")
@@ -166,7 +166,7 @@ def build_dashboard_from_csv(
 
     # Step 8c: Apply theme
     if theme:
-        from cwtwb.style_presets import apply_theme_to_editor
+        from twilize.style_presets import apply_theme_to_editor
 
         try:
             theme_result = apply_theme_to_editor(editor, theme, dashboard_title)

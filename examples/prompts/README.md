@@ -1,6 +1,6 @@
-# cwtwb Prompt Examples
+# twilize Prompt Examples
 
-This directory contains prompt examples for interacting with the `cwtwb` MCP server. You can copy and paste these prompts into an MCP-enabled assistant to automate Tableau workbook generation.
+This directory contains prompt examples for interacting with the `twilize` MCP server. You can copy and paste these prompts into an MCP-enabled assistant to automate Tableau workbook generation.
 
 The prompts span multiple support tiers. Prefer starting with the core-fit and advanced-fit prompts listed in `examples/README.md` before using the recipe-heavy or debugging prompts.
 

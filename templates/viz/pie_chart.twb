@@ -20,10 +20,10 @@
       <connection class='federated'>
         <named-connections>
           <named-connection caption='Sample _ Superstore' name='hyper.1sdvxea11htbno16xdu4b1ug9d1x'>
-            <connection authentication='auth-none' author-locale='zh_CN' class='hyper' dbname='C:/Users/imgwho/Desktop/projects/tableau-viz-generate/Visual Vocabulary- Credit Andy Kriebel.twb 个文件/Data/Extracts/Sample _ Superstore.hyper' default-settings='yes' server='' sslmode='' username='tableau_internal_user' />
+            <connection authentication='auth-none' author-locale='zh_CN' class='hyper' dbname='C:/Users/subhatta123/Desktop/projects/tableau-viz-generate/Visual Vocabulary- Credit Andy Kriebel.twb 个文件/Data/Extracts/Sample _ Superstore.hyper' default-settings='yes' server='' sslmode='' username='tableau_internal_user' />
           </named-connection>
           <named-connection caption='Sample - Superstore' name='excel-direct.0ap29e80je8vze1cyf2z2076vhiv'>
-            <connection class='excel-direct' cleaning='no' compat='no' dataRefreshTime='' filename='C:/Users/imgwho/Desktop/projects/20260227-cwtwb/templates/Sample - Superstore.xls' interpretationMode='0' password='' server='' validate='no' />
+            <connection class='excel-direct' cleaning='no' compat='no' dataRefreshTime='' filename='C:/Users/subhatta123/Desktop/projects/20260227-twilize/templates/Sample - Superstore.xls' interpretationMode='0' password='' server='' validate='no' />
           </named-connection>
         </named-connections>
         <relation connection='excel-direct.0ap29e80je8vze1cyf2z2076vhiv' name='Orders' table='[Orders$]' type='table'>

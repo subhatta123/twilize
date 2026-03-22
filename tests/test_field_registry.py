@@ -6,7 +6,7 @@ import logging
 
 import pytest
 
-from cwtwb.field_registry import FieldRegistry
+from twilize.field_registry import FieldRegistry
 
 
 def _build_registry(*, allow_unknown_fields: bool = False) -> FieldRegistry:

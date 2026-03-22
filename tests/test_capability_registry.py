@@ -1,4 +1,4 @@
-from cwtwb.capability_registry import (
+from twilize.capability_registry import (
     format_capability_catalog,
     format_capability_detail,
     get_capability,
@@ -28,7 +28,7 @@ def test_level_summary_and_catalog_text():
     assert summary["unsupported"] > 0
 
     catalog = format_capability_catalog()
-    assert "cwtwb capability catalog" in catalog
+    assert "twilize capability catalog" in catalog
     assert "[core]" in catalog
     assert "chart: Bar" in catalog
 

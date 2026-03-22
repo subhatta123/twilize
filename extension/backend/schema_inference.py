@@ -1,6 +1,6 @@
 """Classify fields received from Tableau Extensions API.
 
-Maps Tableau data types to cwtwb types and assigns dimension/measure
+Maps Tableau data types to twilize types and assigns dimension/measure
 roles based on type, cardinality, and name patterns.
 """
 
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from cwtwb.csv_to_hyper import (
+from twilize.csv_to_hyper import (
     _DIMENSION_KEYWORDS,
     _GEO_KEYWORDS,
     _MEASURE_KEYWORDS,
@@ -19,7 +19,7 @@ from cwtwb.csv_to_hyper import (
 )
 
 
-# Tableau Extensions API data types → cwtwb types
+# Tableau Extensions API data types → twilize types
 _TABLEAU_TYPE_MAP = {
     "int": "integer",
     "float": "float",
@@ -64,12 +64,12 @@ def classify_tableau_fields(
 
     columns = []
     for i, f in enumerate(fields):
-        cwtwb_type = _TABLEAU_TYPE_MAP.get(f.datatype, "string")
+        twilize_type = _TABLEAU_TYPE_MAP.get(f.datatype, "string")
         # Prefer frontend null_count (from ALL data); fall back to sample estimate
         nc = f.null_count if f.null_count > 0 else fallback_nulls.get(i, 0)
         columns.append(ColumnSpec(
             name=f.name,
-            inferred_type=cwtwb_type,
+            inferred_type=twilize_type,
             sample_values=f.sample_values[:5],
             null_count=nc,
             cardinality=f.cardinality,
@@ -82,7 +82,7 @@ def classify_tableau_fields(
         file_path="<tableau-extension>",
     )
 
-    from cwtwb.csv_to_hyper import classify_columns
+    from twilize.csv_to_hyper import classify_columns
     return classify_columns(raw_schema)
 
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from cwtwb.csv_to_hyper import ClassifiedColumn, ClassifiedSchema
+from twilize.csv_to_hyper import ClassifiedColumn, ClassifiedSchema
 
 logger = logging.getLogger(__name__)
 

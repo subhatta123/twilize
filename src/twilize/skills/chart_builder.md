@@ -1,6 +1,6 @@
 ---
 name: Chart Builder
-description: Expert guidance for choosing chart types, configuring encodings, and building effective visualizations via cwtwb.
+description: Expert guidance for choosing chart types, configuring encodings, and building effective visualizations via twilize.
 phase: 2
 prerequisites: calculation_builder (parameters and calculated fields should be ready)
 ---

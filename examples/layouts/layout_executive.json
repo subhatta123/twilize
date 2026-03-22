@@ -20,7 +20,7 @@
                 },
                 {
                     "type": "text",
-                    "text": "Powered by cwtwb JSON Engine",
+                    "text": "Powered by twilize JSON Engine",
                     "font_color": "#aaaaaa",
                     "weight": 1
                 }

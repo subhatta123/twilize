@@ -16,24 +16,24 @@ from typing import Any
 
 from lxml import etree
 
-from cwtwb.chart_suggester import DashboardSuggestion
-from cwtwb.csv_to_hyper import (
+from twilize.chart_suggester import DashboardSuggestion
+from twilize.csv_to_hyper import (
     ColumnSpec,
     CsvSchema,
     classify_columns,
     csv_to_hyper,
 )
-from cwtwb.dashboard_enhancements import (
+from twilize.dashboard_enhancements import (
     auto_add_actions,
     select_auto_filters,
     validate_suggestion,
 )
-from cwtwb.pipeline import (
+from twilize.pipeline import (
     _safe_worksheet_name,
     _build_chart_kwargs,
     _build_layout,
 )
-from cwtwb.twb_editor import TWBEditor
+from twilize.twb_editor import TWBEditor
 
 from .chart_suggestion import dict_to_suggestion
 from .schema_inference import TableauField, _TABLEAU_TYPE_MAP, _estimate_null_counts
@@ -63,7 +63,7 @@ def generate_workbook(
         Path to the generated .twbx file.
     """
     if not output_dir:
-        output_dir = tempfile.mkdtemp(prefix="cwtwb_ext_")
+        output_dir = tempfile.mkdtemp(prefix="twilize_ext_")
 
     work_dir = Path(output_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -86,10 +86,10 @@ def generate_workbook(
     null_counts = _estimate_null_counts(fields, data_rows[:100], row_count)
     tab_columns = []
     for i, f in enumerate(fields):
-        cwtwb_type = _TABLEAU_TYPE_MAP.get(f.datatype, "string")
+        twilize_type = _TABLEAU_TYPE_MAP.get(f.datatype, "string")
         tab_columns.append(ColumnSpec(
             name=f.name,
-            inferred_type=cwtwb_type,
+            inferred_type=twilize_type,
             sample_values=f.sample_values[:5] if f.sample_values else [],
             null_count=f.null_count if f.null_count > 0 else null_counts.get(i, 0),
             cardinality=f.cardinality,
@@ -244,7 +244,7 @@ def generate_workbook(
 
     # Step 6b: Replace failed charts with fallback alternatives
     if failed_indices and classified:
-        from cwtwb.chart_suggester import suggest_charts as suggest_fallback
+        from twilize.chart_suggester import suggest_charts as suggest_fallback
         fallback_suggestion = suggest_fallback(classified, max_charts=8)
         # Filter to non-KPI, non-duplicate charts; deprioritize Map
         existing_types = {(c.chart_type, frozenset(s.field_name for s in c.shelves))
@@ -323,7 +323,7 @@ def generate_workbook(
         layout_ws = layout.get("_kpi_names", []) + layout.get("_chart_names", [])
         print(f"[PIPELINE] C3 template: {len(layout_ws)} worksheets: {layout_ws}")
     else:
-        from cwtwb.dashboard_layouts import extract_layout_worksheets
+        from twilize.dashboard_layouts import extract_layout_worksheets
         layout_ws = extract_layout_worksheets(layout) if isinstance(layout, dict) else []
         print(f"[PIPELINE] Layout contains {len(layout_ws)} worksheets: {layout_ws}")
 
@@ -358,7 +358,7 @@ def generate_workbook(
         theme_name = plan.get("theme", "modern-light")
         theme_colors = plan.get("theme_colors")
         try:
-            from cwtwb.style_presets import apply_theme_to_editor
+            from twilize.style_presets import apply_theme_to_editor
 
             if theme_colors:
                 result = apply_theme_to_editor(

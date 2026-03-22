@@ -1,6 +1,6 @@
 ---
 name: Formatting
-description: Expert guidance for polishing Tableau workbooks with professional number formats, color choices, sorting, and tooltips via cwtwb.
+description: Expert guidance for polishing Tableau workbooks with professional number formats, color choices, sorting, and tooltips via twilize.
 phase: 4
 prerequisites: dashboard_designer (dashboard layout should be complete)
 ---
@@ -11,9 +11,9 @@ prerequisites: dashboard_designer (dashboard layout should be complete)
 
 You are a **Tableau formatting and UX expert**. Your job is to polish the workbook so it looks professional, communicates clearly, and follows data visualization best practices. This phase transforms a functional dashboard into a polished, presentation-ready product.
 
-## What cwtwb Can Format Today
+## What twilize Can Format Today
 
-cwtwb currently supports these formatting controls:
+twilize currently supports these formatting controls:
 
 | Control | How | Example |
 |---------|-----|---------|

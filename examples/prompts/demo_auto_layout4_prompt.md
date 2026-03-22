@@ -6,12 +6,12 @@ demonstrates: "KPI text cards + bar charts + 3-row layout (header / KPI band / c
 
 # Demo Auto Layout 4 Prompt
 
-This prompt can be directly sent to an AI with `cwtwb` MCP tool access (like Cline, Cursor, or Gemini) to demonstrate the latest Declarative layout features and the fixed Dashboard sizing behavior.
+This prompt can be directly sent to an AI with `twilize` MCP tool access (like Cline, Cursor, or Gemini) to demonstrate the latest Declarative layout features and the fixed Dashboard sizing behavior.
 
 ## Prompt
 
 ```text
-Use cwtwb MCP to build a sales dashboard for me. Call `create_workbook` with no template path to use the built-in Superstore dataset.
+Use twilize MCP to build a sales dashboard for me. Call `create_workbook` with no template path to use the built-in Superstore dataset.
 
 1. Create 2 KPIs: the measures are sales and profit, aggregate with sum, mark type is text.
    Then create 2 Bar charts: "Sales By Ship Mode", "Sales By Category". Sales is the measure.

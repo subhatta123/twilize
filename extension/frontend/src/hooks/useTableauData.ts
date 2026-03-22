@@ -52,27 +52,27 @@ export function useTableauData() {
     try {
       await initTableauExtension()
       tableauInitialized = true
-      console.log('[cwtwb] Tableau Extensions API initialized successfully')
+      console.log('[twilize] Tableau Extensions API initialized successfully')
     } catch (initErr) {
-      console.log('[cwtwb] initializeAsync failed:', initErr)
+      console.log('[twilize] initializeAsync failed:', initErr)
     }
 
     if (tableauInitialized) {
       // We're inside Tableau — read real data
       try {
         const result = await extractTableauData()
-        console.log('[cwtwb] Got', result.fields.length, 'fields,', result.dataRows.length, 'rows')
+        console.log('[twilize] Got', result.fields.length, 'fields,', result.dataRows.length, 'rows')
         setFields(result.fields)
         setDataRows(result.dataRows)
         setRowCount(result.rowCount)
       } catch (dataErr) {
         const msg = dataErr instanceof Error ? dataErr.message : 'Failed to extract data'
-        console.error('[cwtwb] Data extraction failed:', msg)
+        console.error('[twilize] Data extraction failed:', msg)
         setError(msg)
       }
     } else {
       // Not inside Tableau — use demo data
-      console.log('[cwtwb] Using demo data (not inside Tableau)')
+      console.log('[twilize] Using demo data (not inside Tableau)')
       setFields(DEMO_FIELDS)
       setDataRows(DEMO_ROWS)
       setRowCount(20)

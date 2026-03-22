@@ -6,7 +6,7 @@ a 2×2 grid dashboard. Optionally switches the datasource to the bundled EU
 Superstore Hyper extract when tableauhyperapi is installed.
 
 Requirements:
-    pip install "cwtwb[examples]"   # adds tableauhyperapi
+    pip install "twilize[examples]"   # adds tableauhyperapi
 
 Usage:
     python examples/scripts/demo_hyper_and_new_charts.py
@@ -19,8 +19,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 from tableauhyperapi import Connection, HyperException, HyperProcess, Telemetry
 
-from cwtwb import TWBEditor
-from cwtwb.config import REFERENCES_DIR
+from twilize import TWBEditor
+from twilize.config import REFERENCES_DIR
 
 
 HYPER_FILE = REFERENCES_DIR / "Sample - EU Superstore.hyper"

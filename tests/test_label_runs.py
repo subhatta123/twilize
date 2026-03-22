@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 from lxml import etree
 
-from cwtwb.twb_editor import TWBEditor
+from twilize.twb_editor import TWBEditor
 
 
 @pytest.fixture

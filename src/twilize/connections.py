@@ -32,7 +32,7 @@ def inspect_hyper_schema(filepath: str) -> dict:
     from tableauhyperapi import HyperProcess, Connection, Telemetry, SchemaName
 
     # Copy to a temp file so we don't fail on locked hyper files
-    tmp_dir = tempfile.mkdtemp(prefix="cwtwb_hyper_")
+    tmp_dir = tempfile.mkdtemp(prefix="twilize_hyper_")
     tmp_path = os.path.join(tmp_dir, os.path.basename(filepath))
     try:
         shutil.copy2(filepath, tmp_path)

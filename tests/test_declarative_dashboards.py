@@ -3,7 +3,7 @@ from pathlib import Path
 from lxml import etree
 import shutil
 
-from cwtwb.twb_editor import TWBEditor
+from twilize.twb_editor import TWBEditor
 
 
 @pytest.fixture

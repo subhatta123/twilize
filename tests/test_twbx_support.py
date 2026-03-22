@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from cwtwb.twb_editor import TWBEditor
+from twilize.twb_editor import TWBEditor
 
 
 # ---------------------------------------------------------------------------
@@ -221,17 +221,17 @@ class TestTwbxModifyAndResave:
 
 class TestMcpToolsTwbx:
     def test_open_workbook_accepts_twbx(self):
-        from cwtwb.mcp.tools_workbook import open_workbook
+        from twilize.mcp.tools_workbook import open_workbook
         result = open_workbook(str(TWBX_FILE))
         assert "Workbook opened" in result
 
     def test_create_workbook_accepts_twbx(self):
-        from cwtwb.mcp.tools_workbook import create_workbook
+        from twilize.mcp.tools_workbook import create_workbook
         result = create_workbook(str(TWBX_FILE))
         assert "Workbook created" in result
 
     def test_save_workbook_as_twbx(self, tmp_path):
-        from cwtwb.mcp.tools_workbook import open_workbook, save_workbook
+        from twilize.mcp.tools_workbook import open_workbook, save_workbook
         open_workbook(str(TWBX_FILE))
         out = str(tmp_path / "mcp_out.twbx")
         result = save_workbook(out)
@@ -239,7 +239,7 @@ class TestMcpToolsTwbx:
         assert zipfile.is_zipfile(out)
 
     def test_save_workbook_as_twb_from_twbx(self, tmp_path):
-        from cwtwb.mcp.tools_workbook import open_workbook, save_workbook
+        from twilize.mcp.tools_workbook import open_workbook, save_workbook
         open_workbook(str(TWBX_FILE))
         out = str(tmp_path / "mcp_out.twb")
         result = save_workbook(out)

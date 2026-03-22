@@ -10,7 +10,7 @@ Usage:
 """
 import os
 from pathlib import Path
-from cwtwb.twb_editor import TWBEditor
+from twilize.twb_editor import TWBEditor
 
 def main():
     base_dir = Path(__file__).parent.parent.parent

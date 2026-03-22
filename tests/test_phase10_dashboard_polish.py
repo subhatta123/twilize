@@ -4,22 +4,22 @@ import csv
 
 import pytest
 
-from cwtwb.chart_suggester import (
+from twilize.chart_suggester import (
     ChartSuggestion,
     DashboardSuggestion,
     ShelfAssignment,
     _story_score,
     suggest_charts,
 )
-from cwtwb.csv_to_hyper import (
+from twilize.csv_to_hyper import (
     ClassifiedColumn,
     ClassifiedSchema,
     ColumnSpec,
     classify_columns,
     infer_csv_schema,
 )
-from cwtwb.dashboard_enhancements import _map_replacement, validate_suggestion
-from cwtwb.viz_best_practices import (
+from twilize.dashboard_enhancements import _map_replacement, validate_suggestion
+from twilize.viz_best_practices import (
     BEST_PRACTICES_PROMPT,
     DATA_PATTERN_CHART_MAP,
     KPI_GUIDELINES,
@@ -177,7 +177,7 @@ class TestBANLayout:
     """Executive-summary template gives KPIs prominent space."""
 
     def test_executive_summary_kpi_row_height(self):
-        from cwtwb.layout_templates import get_template
+        from twilize.layout_templates import get_template
 
         layout = get_template("executive-summary", ["KPI1", "KPI2", "Chart1", "Chart2"])
         # Top-level is vertical container
@@ -188,7 +188,7 @@ class TestBANLayout:
         assert kpi_row.get("fixed_size") == 100
 
     def test_executive_summary_kpi_row_has_both_kpis(self):
-        from cwtwb.layout_templates import get_template
+        from twilize.layout_templates import get_template
 
         layout = get_template("executive-summary", ["KPI1", "KPI2", "Chart1"])
         kpi_row = layout["children"][0]
@@ -207,7 +207,7 @@ class TestBANLayout:
         assert "KPI2" in ws_names
 
     def test_kpi_detail_has_top_row_kpis(self):
-        from cwtwb.layout_templates import get_template
+        from twilize.layout_templates import get_template
 
         layout = get_template("kpi-detail", ["KPI1", "KPI2", "Main1", "Main2"])
         kpi_row = layout["children"][0]

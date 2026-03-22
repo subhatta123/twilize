@@ -10,17 +10,17 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from cwtwb.chart_suggester import (
+from twilize.chart_suggester import (
     ChartSuggestion,
     DashboardSuggestion,
     ShelfAssignment,
     deduplicate_charts,
     smart_aggregation,
 )
-from cwtwb.csv_to_hyper import ClassifiedSchema
+from twilize.csv_to_hyper import ClassifiedSchema
 
 if TYPE_CHECKING:
-    from cwtwb.twb_editor import TWBEditor
+    from twilize.twb_editor import TWBEditor
 
 logger = logging.getLogger(__name__)
 

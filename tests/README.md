@@ -1,6 +1,6 @@
-# cwtwb Test Suite
+# twilize Test Suite
 
-This directory contains the full test suite for the **cwtwb** SDK and MCP server.
+This directory contains the full test suite for the **twilize** SDK and MCP server.
 
 ## Running Tests
 
@@ -18,7 +18,7 @@ pytest tests/test_connections.py -v
 pytest tests/test_worksheet_style.py::TestHideBasicOptions -v
 
 # Run with coverage (requires pytest-cov)
-pytest tests/ --cov=src/cwtwb --cov-report=term-missing
+pytest tests/ --cov=src/twilize --cov-report=term-missing
 ```
 
 ---

@@ -13,12 +13,12 @@ Usage:
 import sys
 from pathlib import Path
 
-# Add src to sys.path to easily import the local cwtwb package
+# Add src to sys.path to easily import the local twilize package
 project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root / "src"))
 
-from cwtwb.charts.showcase_recipes import configure_chart_recipe
-from cwtwb.twb_editor import TWBEditor
+from twilize.charts.showcase_recipes import configure_chart_recipe
+from twilize.twb_editor import TWBEditor
 
 
 def main():

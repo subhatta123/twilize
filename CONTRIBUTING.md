@@ -1,10 +1,10 @@
-# Contributing to cwtwb
+# Contributing to twilize
 
 ## Quick start
 
 ```bash
-git clone https://github.com/your-org/cwtwb
-cd cwtwb
+git clone https://github.com/your-org/twilize
+cd twilize
 pip install -e ".[dev]"
 pytest
 ```
@@ -23,10 +23,10 @@ section in `tests/README.md` first.
 MCP tool call  (tools_workbook.py / tools_migration.py / tools_support.py)
       │
       ▼
-ChartsMixin method  (src/cwtwb/charts/__init__.py)
+ChartsMixin method  (src/twilize/charts/__init__.py)
       │  facade: stable public API, no logic
       ▼
-Dispatcher function  (src/cwtwb/charts/dispatcher.py)
+Dispatcher function  (src/twilize/charts/dispatcher.py)
       │  selects the right builder based on mark_type + routing_policy.py
       ▼
 Concrete Builder  (builder_basic.py / builder_dual_axis.py / builder_pie.py / …)
@@ -60,7 +60,7 @@ causes silent divergence between the Python API and the MCP surface.
 | `charts/builder_maps.py` | Filled and symbol maps |
 | `charts/helpers.py` | `apply_worksheet_style`, `setup_table_style`, shared XML primitives |
 | `field_registry.py` | Tracks calculated fields added in this session; used for datasource-dep injection |
-| `capability_registry.py` | Declares what cwtwb supports; used by `analyze_twb` and `list_capabilities` |
+| `capability_registry.py` | Declares what twilize supports; used by `analyze_twb` and `list_capabilities` |
 | `migration.py` | Field-mapping inference and workbook rewrite for datasource migration |
 | `validator.py` | Structural and XSD validation called by `save()` |
 | `mcp/` | MCP server tool definitions (thin wrappers; no logic lives here) |
@@ -116,7 +116,7 @@ asserts the expected XML is present using XPath.
 
 ## Adding a new chart type
 
-1. Create `src/cwtwb/charts/builder_mytype.py` subclassing `BaseChartBuilder`
+1. Create `src/twilize/charts/builder_mytype.py` subclassing `BaseChartBuilder`
 2. Add a routing rule in `charts/routing_policy.py`
 3. Import and dispatch in `charts/dispatcher.py`
 4. Declare the capability in `capability_registry.py`
@@ -127,7 +127,7 @@ asserts the expected XML is present using XPath.
 
 ## Adding a capability to the registry
 
-Open `src/cwtwb/capability_registry.py` and add an entry to `CAPABILITIES`:
+Open `src/twilize/capability_registry.py` and add an entry to `CAPABILITIES`:
 
 ```python
 Capability(

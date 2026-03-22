@@ -11,10 +11,10 @@ Usage:
 import sys
 from pathlib import Path
 
-# Add src to path so we can import local cwtwb
+# Add src to path so we can import local twilize
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from cwtwb.twb_editor import TWBEditor
+from twilize.twb_editor import TWBEditor
 
 def main():
     print("=== Demo: Database Connections ===")

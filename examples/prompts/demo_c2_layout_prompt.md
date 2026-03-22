@@ -8,7 +8,7 @@ requires: "examples/layouts/layout_c2.json"
 # C.2 Layout Server Prompt
 
 ```text
-Hi, let's build the "C.2 Layout Replica" dashboard using the cwtwb MCP server.
+Hi, let's build the "C.2 Layout Replica" dashboard using the twilize MCP server.
 
 1. Call `create_workbook` with no template path to use the built-in Superstore dataset.
 2. I need exactly 8 charts. Four are regular Bar charts showing Sales automatically broken down by Ship Mode. Please name them:

@@ -4,14 +4,14 @@ import csv
 
 import pytest
 
-from cwtwb.chart_suggester import (
+from twilize.chart_suggester import (
     ChartSuggestion,
     DashboardSuggestion,
     format_suggestions,
     smart_aggregation,
     suggest_charts,
 )
-from cwtwb.csv_to_hyper import classify_columns, infer_csv_schema
+from twilize.csv_to_hyper import classify_columns, infer_csv_schema
 
 
 @pytest.fixture

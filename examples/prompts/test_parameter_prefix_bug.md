@@ -6,7 +6,7 @@ demonstrates: "Parameter creation + calculated fields with/without [Parameters].
 
 # Test Parameter Prefix Bug
 
-Please use the `cwtwb` mcp server to create a simple Tableau workbook to verify parameter creation and references.
+Please use the `twilize` mcp server to create a simple Tableau workbook to verify parameter creation and references.
 Save it to `output/test_param_prefix.twb`.
 
 Here are the requirements:

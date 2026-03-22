@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from cwtwb.server import describe_capability, diff_template_gap
-from cwtwb.twb_analyzer import analyze_workbook
-from cwtwb.twb_editor import TWBEditor
+from twilize.server import describe_capability, diff_template_gap
+from twilize.twb_analyzer import analyze_workbook
+from twilize.twb_editor import TWBEditor
 
 
 def test_analyze_generated_workbook_detects_core_and_advanced():

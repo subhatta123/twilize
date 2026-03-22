@@ -1,4 +1,4 @@
-﻿"""Canonical capability catalog for cwtwb.
+﻿"""Canonical capability catalog for twilize.
 
 This module defines the project's explicit capability boundary so the SDK,
 MCP tools, docs, and tests can reference the same source of truth.
@@ -23,7 +23,7 @@ CapabilityKind = Literal[
 
 @dataclass(frozen=True)
 class CapabilitySpec:
-    """A single declared capability in cwtwb."""
+    """A single declared capability in twilize."""
 
     key: str
     kind: CapabilityKind
@@ -361,7 +361,7 @@ CAPABILITY_SPECS: tuple[CapabilitySpec, ...] = (
         level="unsupported",
         canonical="Table Calculation",
         aliases=("table calc",),
-        rationale="Known Tableau feature outside cwtwb's current supported surface.",
+        rationale="Known Tableau feature outside twilize's current supported surface.",
     ),
     CapabilitySpec(
         key="csv-pipeline",
@@ -393,7 +393,7 @@ CAPABILITY_SPECS: tuple[CapabilitySpec, ...] = (
         level="unsupported",
         canonical="Bin",
         aliases=("bins",),
-        rationale="Known Tableau feature outside cwtwb's current supported surface.",
+        rationale="Known Tableau feature outside twilize's current supported surface.",
     ),
     CapabilitySpec(
         key="set",
@@ -401,7 +401,7 @@ CAPABILITY_SPECS: tuple[CapabilitySpec, ...] = (
         level="unsupported",
         canonical="Set",
         aliases=("sets",),
-        rationale="Known Tableau feature outside cwtwb's current supported surface.",
+        rationale="Known Tableau feature outside twilize's current supported surface.",
     ),
 )
 
@@ -488,7 +488,7 @@ def format_capability_catalog(level_filter: Optional[str] = None) -> str:
         level_filter: If provided, only include capabilities of this level
                       (e.g. "core", "advanced", "recipe", "unsupported").
     """
-    lines = ["cwtwb capability catalog", ""]
+    lines = ["twilize capability catalog", ""]
     summary = get_level_summary()
     lines.append(
         "Levels: "

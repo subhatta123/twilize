@@ -17,7 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
-from cwtwb.server import (  # noqa: E402
+from twilize.server import (  # noqa: E402
     add_worksheet,
     configure_chart,
     configure_chart_recipe,

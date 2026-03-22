@@ -1,6 +1,6 @@
 ---
 name: Dashboard Designer
-description: Expert guidance for creating professional Tableau dashboard layouts, filter panels, and interaction actions via cwtwb.
+description: Expert guidance for creating professional Tableau dashboard layouts, filter panels, and interaction actions via twilize.
 phase: 3
 prerequisites: chart_builder (all worksheets should be ready)
 ---

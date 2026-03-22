@@ -19,7 +19,7 @@
       <connection class="federated">
         <named-connections>
           <named-connection caption="Sample - Superstore" name="excel-direct.1gzzs5t1wlixqg1bxauxn0fv1hll">
-            <connection class="excel-direct" cleaning="no" compat="no" dataRefreshTime="" filename="C:/Users/imgwho/Desktop/projects/20260227-cwtwb/src/cwtwb/references/Sample - Superstore - simple.xls" interpretationMode="0" password="" server="" validate="no"/>
+            <connection class="excel-direct" cleaning="no" compat="no" dataRefreshTime="" filename="C:/Users/subhatta123/Desktop/projects/20260227-twilize/src/twilize/references/Sample - Superstore - simple.xls" interpretationMode="0" password="" server="" validate="no"/>
           </named-connection>
         </named-connections>
         <relation connection="excel-direct.1gzzs5t1wlixqg1bxauxn0fv1hll" name="Orders" table="[Orders$]" type="table">

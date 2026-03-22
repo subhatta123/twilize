@@ -7,14 +7,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from cwtwb.migration import (  # noqa: E402
+from twilize.migration import (  # noqa: E402
     apply_twb_migration,
     migrate_twb_guided,
     preview_twb_migration,
     profile_twb_for_migration,
     propose_field_mapping,
 )
-from cwtwb.server import (  # noqa: E402
+from twilize.server import (  # noqa: E402
     apply_twb_migration as apply_twb_migration_tool,
     migrate_twb_guided as migrate_twb_guided_tool,
     preview_twb_migration as preview_twb_migration_tool,

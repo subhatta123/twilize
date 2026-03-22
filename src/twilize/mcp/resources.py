@@ -1,4 +1,4 @@
-"""MCP resources exposed by cwtwb — read-only reference data for AI agents.
+"""MCP resources exposed by twilize — read-only reference data for AI agents.
 
 Resources are different from tools: they are read-only data blobs that an
 AI agent fetches for context, not actions that modify state.
@@ -7,14 +7,14 @@ AVAILABLE RESOURCES
 -------------------
   file://docs/tableau_all_functions.json
       Complete list of Tableau calculation functions with syntax and examples.
-      Source: docs/tableau_all_functions.json (bundled with cwtwb).
+      Source: docs/tableau_all_functions.json (bundled with twilize).
       Use this to look up function signatures when writing calculated fields.
 
-  cwtwb://skills/index
+  twilize://skills/index
       Markdown index listing all available agent skill files with descriptions.
       Read this first to understand which skills exist before fetching one.
 
-  cwtwb://skills/{skill_name}
+  twilize://skills/{skill_name}
       A specific agent skill Markdown file.  Skills are expert-level guides
       for common phases of workbook construction:
         - calculation_builder  → writing Tableau formulas and calculated fields
@@ -25,8 +25,8 @@ AVAILABLE RESOURCES
 USAGE PATTERN (recommended by server instructions)
 ---------------------------------------------------
   Before each major phase, fetch the relevant skill:
-    read_resource("cwtwb://skills/chart_builder")    # before configure_chart
-    read_resource("cwtwb://skills/dashboard_designer") # before add_dashboard
+    read_resource("twilize://skills/chart_builder")    # before configure_chart
+    read_resource("twilize://skills/dashboard_designer") # before add_dashboard
 """
 
 from __future__ import annotations
@@ -54,15 +54,15 @@ _SKILL_NAMES = [
 ]
 
 
-@server.resource("cwtwb://skills/index")
+@server.resource("twilize://skills/index")
 def read_skills_index() -> str:
-    """List all available cwtwb agent skills."""
+    """List all available twilize agent skills."""
 
     lines = [
-        "# cwtwb Agent Skills",
+        "# twilize Agent Skills",
         "",
         "Load a skill before each phase for expert-level guidance.",
-        "Read a skill with: read_resource('cwtwb://skills/<skill_name>')",
+        "Read a skill with: read_resource('twilize://skills/<skill_name>')",
         "",
         "## Available Skills (in recommended order)",
         "",
@@ -80,9 +80,9 @@ def read_skills_index() -> str:
     return "\n".join(lines)
 
 
-@server.resource("cwtwb://skills/{skill_name}")
+@server.resource("twilize://skills/{skill_name}")
 def read_skill(skill_name: str) -> str:
-    """Read a specific cwtwb agent skill."""
+    """Read a specific twilize agent skill."""
 
     skill_path = SKILLS_DIR / f"{skill_name}.md"
     if not skill_path.exists():

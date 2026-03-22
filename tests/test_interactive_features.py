@@ -1,7 +1,7 @@
 import unittest
 import lxml.etree as etree
 from pathlib import Path
-from cwtwb.twb_editor import TWBEditor
+from twilize.twb_editor import TWBEditor
 
 class TestInteractiveFeatures(unittest.TestCase):
     def setUp(self):

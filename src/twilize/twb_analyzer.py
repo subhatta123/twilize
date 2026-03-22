@@ -1,6 +1,6 @@
 ﻿"""Read-only capability analysis for existing Tableau workbooks.
 
-The analyzer parses a TWB file and maps detected XML features to cwtwb's
+The analyzer parses a TWB file and maps detected XML features to twilize's
 capability registry (core/advanced/recipe/unsupported). It is used by MCP
 tools to judge template fit, surface migration risks, and explain why a
 workbook is or is not a good support target.
@@ -174,7 +174,7 @@ class AnalysisReport:
 
 
 class TWBAnalyzer:
-    """Inspect a TWB file and map observed features onto cwtwb capabilities."""
+    """Inspect a TWB file and map observed features onto twilize capabilities."""
 
     def analyze(self, file_path: str | Path) -> AnalysisReport:
         """Run all detectors and return a normalized analysis report."""

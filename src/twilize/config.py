@@ -1,7 +1,7 @@
-"""Shared configuration constants for cwtwb.
+"""Shared configuration constants for twilize.
 
 This module provides path constants and configuration used across
-the cwtwb package. Extracted to avoid circular imports between
+the twilize package. Extracted to avoid circular imports between
 twb_editor.py and server.py.
 """
 

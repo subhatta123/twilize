@@ -1,4 +1,4 @@
-# cwtwb Skills — Specialized Agent Workflow
+# twilize Skills — Specialized Agent Workflow
 
 Skills are expert-level guidance files that help AI agents produce **professional-quality** Tableau workbooks. Each skill focuses on one phase of the dashboard creation process.
 
@@ -18,11 +18,11 @@ Phase 4: formatting            →  Number formats, colors, sorting, tooltips
 Read skills as needed during dashboard creation:
 
 ```
-1. read_resource("cwtwb://skills/index")           → See available skills
-2. read_resource("cwtwb://skills/calculation_builder") → Load Phase 1 expertise
-3. read_resource("cwtwb://skills/chart_builder")       → Load Phase 2 expertise
-4. read_resource("cwtwb://skills/dashboard_designer")  → Load Phase 3 expertise
-5. read_resource("cwtwb://skills/formatting")          → Load Phase 4 expertise
+1. read_resource("twilize://skills/index")           → See available skills
+2. read_resource("twilize://skills/calculation_builder") → Load Phase 1 expertise
+3. read_resource("twilize://skills/chart_builder")       → Load Phase 2 expertise
+4. read_resource("twilize://skills/dashboard_designer")  → Load Phase 3 expertise
+5. read_resource("twilize://skills/formatting")          → Load Phase 4 expertise
 ```
 
 ### For Humans
@@ -30,7 +30,7 @@ Read skills as needed during dashboard creation:
 Include a skill reference in your prompt:
 
 ```
-Please read the cwtwb chart_builder and dashboard_designer skills, 
+Please read the twilize chart_builder and dashboard_designer skills, 
 then create a sales analysis dashboard for me.
 ```
 

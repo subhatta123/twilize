@@ -5,7 +5,7 @@ from pathlib import Path
 
 import lxml.etree as etree
 
-from cwtwb.twb_editor import TWBEditor
+from twilize.twb_editor import TWBEditor
 
 
 class TestParameters(unittest.TestCase):

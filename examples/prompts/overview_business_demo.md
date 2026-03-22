@@ -7,7 +7,7 @@ description: Natural Language Prompt (Business Executive Demo) — Superstore Ov
 
 # Create a Superstore Profitability Overview Dashboard
 
-Please use cwtwb mcp tool create a new Tableau workbook using the Superstore template and save it to output directory. answer me in english.
+Please use twilize mcp tool create a new Tableau workbook using the Superstore template and save it to output directory. answer me in english.
 
 ## The Business Context
 I want to build a "Superstore Profitability Overview" dashboard that helps our executives analyze performance across geography, product categories, and customer segments. We also need to run "What-If" scenarios to forecast sales and evaluate different profitability targets.

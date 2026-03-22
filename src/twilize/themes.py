@@ -38,7 +38,7 @@ class ThemesMixin:
         self,
         palette_name: str = "",
         colors: list[str] | None = None,
-        custom_name: str = "cwtwb-palette",
+        custom_name: str = "twilize-palette",
     ) -> str:
         """Set a custom color palette in the workbook preferences.
 

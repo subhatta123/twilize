@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from cwtwb.twb_editor import TWBEditor
+from twilize.twb_editor import TWBEditor
 
 TEMPLATE = Path(__file__).parent.parent / "templates" / "twb" / "superstore.twb"
 

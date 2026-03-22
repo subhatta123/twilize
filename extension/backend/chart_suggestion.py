@@ -12,16 +12,16 @@ import logging
 import os
 from typing import Any, Optional
 
-from cwtwb.chart_suggester import (
+from twilize.chart_suggester import (
     ChartSuggestion,
     DashboardSuggestion,
     ShelfAssignment,
     smart_aggregation,
     suggest_charts,
 )
-from cwtwb.csv_to_hyper import ClassifiedSchema
-from cwtwb.dashboard_enhancements import validate_suggestion
-from cwtwb.viz_best_practices import BEST_PRACTICES_PROMPT
+from twilize.csv_to_hyper import ClassifiedSchema
+from twilize.dashboard_enhancements import validate_suggestion
+from twilize.viz_best_practices import BEST_PRACTICES_PROMPT
 
 from .schema_inference import TableauField, classify_tableau_fields
 
@@ -133,7 +133,7 @@ def suggest_dashboard(
             result["_warning"] = _llm_warning
         return result
 
-    from cwtwb.chart_suggester import _auto_detect_theme
+    from twilize.chart_suggester import _auto_detect_theme
 
     # If the user provided a prompt, parse it for chart type / field hints
     if prompt and prompt.strip():
@@ -755,7 +755,7 @@ def _image_guided_suggest(
     geographic = schema.geographic
     cat_dims = [d for d in dims if d.semantic_type == "categorical"]
 
-    # Map image chart types to cwtwb mark types
+    # Map image chart types to twilize mark types
     _IMAGE_TYPE_MAP = {
         "bar": "Bar",
         "line": "Line",
@@ -883,7 +883,7 @@ def _safe_ws_name(title: str, index: int) -> str:
 # Prompt-guided rule-based suggestion (no LLM API key required)
 # ---------------------------------------------------------------------------
 
-# Map of keywords found in user prompts to cwtwb mark types
+# Map of keywords found in user prompts to twilize mark types
 _PROMPT_CHART_MAP = {
     "bar": "Bar", "bar chart": "Bar", "horizontal bar": "Bar",
     "line": "Line", "line chart": "Line", "trend": "Line", "time series": "Line",
@@ -912,7 +912,7 @@ def _prompt_guided_suggest(
     Falls back to ``suggest_charts`` for any remaining slots.
     """
     import re
-    from cwtwb.chart_suggester import _kpi_title
+    from twilize.chart_suggester import _kpi_title
 
     prompt_lower = prompt.lower()
 

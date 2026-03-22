@@ -1,12 +1,12 @@
-from cwtwb.charts.dispatcher import (
+from twilize.charts.dispatcher import (
     configure_chart as dispatch_chart,
     configure_dual_axis as dispatch_dual_axis,
     decide_chart_builder,
     decide_dual_axis_builder,
 )
-from cwtwb.charts import dispatcher
-from cwtwb.charts.pattern_mapping import normalize_chart_pattern
-from cwtwb.charts.routing_policy import profile_chart_request, profile_dual_axis_request
+from twilize.charts import dispatcher
+from twilize.charts.pattern_mapping import normalize_chart_pattern
+from twilize.charts.routing_policy import profile_chart_request, profile_dual_axis_request
 
 
 def test_advanced_pattern_mapping_normalizes_expected_marks():

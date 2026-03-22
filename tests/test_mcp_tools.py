@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from cwtwb.server import (
+from twilize.server import (
     add_calculated_field,
     add_worksheet,
     create_workbook,
@@ -153,7 +153,7 @@ class TestInspectTargetSchema:
 class TestListCapabilities:
     def test_returns_catalog_text(self):
         result = list_capabilities()
-        assert "cwtwb capability catalog" in result
+        assert "twilize capability catalog" in result
         assert "chart: Bar" in result
         assert "[core]" in result
 
@@ -163,10 +163,10 @@ class TestListCapabilities:
         assert "Donut" in result or "donut" in result.lower()
 
     def test_level_filter_core_only(self):
-        from cwtwb.server import list_capabilities as lc
+        from twilize.server import list_capabilities as lc
         # list_capabilities MCP tool returns the full catalog; internal function
         # accepts a level filter — verify via the registry directly
-        from cwtwb.capability_registry import format_capability_catalog
+        from twilize.capability_registry import format_capability_catalog
         core_catalog = format_capability_catalog(level_filter="core")
         assert "[core]" in core_catalog
         assert "[recipe]" not in core_catalog
@@ -185,7 +185,7 @@ class TestAnalyzeTwb:
 
     def test_analyze_generated_workbook(self, tmp_path):
         add_worksheet("Sales Bar")
-        from cwtwb.server import configure_chart
+        from twilize.server import configure_chart
         configure_chart("Sales Bar", mark_type="Bar", rows=["Category"], columns=["SUM(Sales)"])
         output = tmp_path / "analyze_test.twb"
         save_workbook(str(output))

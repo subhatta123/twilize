@@ -2,12 +2,12 @@
 
 import pytest
 
-from cwtwb.docapi_bridge import (
+from twilize.docapi_bridge import (
     get_connection_info,
     is_available,
     list_datasource_fields,
 )
-from cwtwb.twb_editor import TWBEditor
+from twilize.twb_editor import TWBEditor
 
 
 @pytest.fixture

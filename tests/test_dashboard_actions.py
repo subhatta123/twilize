@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 from lxml import etree
-from cwtwb.twb_editor import TWBEditor
+from twilize.twb_editor import TWBEditor
 
 class TestDashboardActions(unittest.TestCase):
     def setUp(self):

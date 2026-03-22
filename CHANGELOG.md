@@ -22,8 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **XSD schema validation** against the official Tableau TWB XSD (2026.1), vendored at `vendor/tableau-document-schemas/`:
   - `TWBEditor.validate_schema()` — validates the in-memory workbook without saving first; returns a `SchemaValidationResult` with `valid`, `errors`, `schema_available`, and `to_text()` summary.
   - `validate_workbook` MCP tool — validates the current open workbook (in memory) or any `.twb`/`.twbx` file on disk by path. Errors are reported as informational; Tableau itself occasionally generates workbooks that deviate from the schema.
-  - `validate_against_schema(root)` — public SDK function in `cwtwb.validator`, accepts an lxml `_Element` and returns `SchemaValidationResult`.
-  - `SchemaValidationResult` exported from the top-level `cwtwb` package.
+  - `validate_against_schema(root)` — public SDK function in `twilize.validator`, accepts an lxml `_Element` and returns `SchemaValidationResult`.
+  - `SchemaValidationResult` exported from the top-level `twilize` package.
   - Two missing XSD imports (`http://www.tableausoftware.com/xml/user` and `http://www.w3.org/XML/1998/namespace`) resolved via local stub XSD files written to `vendor/tableau-document-schemas/schemas/2026_1/` at first use; schema is loaded once and cached for the process lifetime.
 
 ## [0.14.0] - 2026-03-17
@@ -80,13 +80,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.12.0] - 2026-03-13
 
 ### Added
-- **Bundled Hyper Extracts**: `Sample - EU Superstore.hyper` and `Sample _ Superstore.hyper` are now included in `src/cwtwb/references/` and distributed with the wheel. `hyper_and_new_charts.py` and `build_exec_overview.py` no longer require a cloned repository.
+- **Bundled Hyper Extracts**: `Sample - EU Superstore.hyper` and `Sample _ Superstore.hyper` are now included in `src/twilize/references/` and distributed with the wheel. `hyper_and_new_charts.py` and `build_exec_overview.py` no longer require a cloned repository.
 - **Progressive Examples**: All scripts in `examples/scripts/` (5 steps, Beginner → Advanced) and prompts in `examples/prompts/` (10 steps, Beginner → Advanced) now carry explicit step numbers and difficulty labels. `examples/README.md` rewritten with a Quick Start section and full progression tables.
 
 ### Fixed
-- **Packaging**: Removed redundant `artifacts` declarations from `pyproject.toml`. All non-Python files under `src/cwtwb/` are git-tracked and included in the wheel automatically via `packages = ["src/cwtwb"]`.
-- **`.gitignore`**: Added `!src/cwtwb/references/*.hyper` exception so bundled Hyper files are tracked by git and always present at wheel build time.
-- **Examples — zero external dependencies**: All scripts in `examples/scripts/` and prompts in `examples/prompts/` updated to use `TWBEditor("")` / `create_workbook("")` (built-in default template) instead of hard-coded paths to `templates/twb/superstore.twb`. All work after a plain `pip install cwtwb`.
+- **Packaging**: Removed redundant `artifacts` declarations from `pyproject.toml`. All non-Python files under `src/twilize/` are git-tracked and included in the wheel automatically via `packages = ["src/twilize"]`.
+- **`.gitignore`**: Added `!src/twilize/references/*.hyper` exception so bundled Hyper files are tracked by git and always present at wheel build time.
+- **Examples — zero external dependencies**: All scripts in `examples/scripts/` and prompts in `examples/prompts/` updated to use `TWBEditor("")` / `create_workbook("")` (built-in default template) instead of hard-coded paths to `templates/twb/superstore.twb`. All work after a plain `pip install twilize`.
 
 ## [0.11.0] - 2026-03-13
 
@@ -139,8 +139,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Hyper Example Coverage**: Added `tests/test_hyper_example.py` to lock in the Advent Calendar Hyper example's physical `Orders_*` table resolution via Tableau Hyper API.
 
 ### Changed
-- **Product Positioning**: Updated the root README and example READMEs to describe `cwtwb` as a workbook engineering toolkit rather than a conversational analysis competitor.
-- **Chart Architecture**: Refactored chart handling into focused modules under `src/cwtwb/charts/`, including dispatcher, pattern mapping, routing policy, helpers, and a dedicated text builder while keeping the public `configure_chart` API stable.
+- **Product Positioning**: Updated the root README and example READMEs to describe `twilize` as a workbook engineering toolkit rather than a conversational analysis competitor.
+- **Chart Architecture**: Refactored chart handling into focused modules under `src/twilize/charts/`, including dispatcher, pattern mapping, routing policy, helpers, and a dedicated text builder while keeping the public `configure_chart` API stable.
 - **Dashboard Architecture**: Split dashboard orchestration, layout resolution, datasource dependency generation, and action creation into dedicated modules while keeping `DashboardsMixin` as a thin compatibility facade.
 - **Layout Architecture**: Split declarative layout computation and XML rendering into `layout_model.py` and `layout_rendering.py`, leaving `layout.py` as a compatibility export layer.
 - **MCP Architecture**: Split the MCP server implementation into `mcp/app.py`, `mcp/state.py`, `mcp/resources.py`, `mcp/tools_support.py`, `mcp/tools_layout.py`, and `mcp/tools_workbook.py`, with `server.py` now acting as a thin compatibility entry point.
@@ -158,7 +158,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `chart_builder.md` — Phase 2: Chart type selection, encodings, filter strategy
   - `dashboard_designer.md` — Phase 3: Layout design, filter panels, interaction actions
   - `formatting.md` — Phase 4: Number formats, color strategy, sorting, tooltips
-- **Skills MCP Resources**: Skills are exposed via MCP protocol as `cwtwb://skills/index` and `cwtwb://skills/{skill_name}`, allowing AI agents to load domain expertise on demand.
+- **Skills MCP Resources**: Skills are exposed via MCP protocol as `twilize://skills/index` and `twilize://skills/{skill_name}`, allowing AI agents to load domain expertise on demand.
 - **Updated MCP Server Instructions**: Server instructions now prompt AI agents to read skills before each phase for professional-quality output.
 
 ### Changed
@@ -271,7 +271,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Core library** (`cwtwb`):
+- **Core library** (`twilize`):
   - `FieldRegistry`: Field name ↔ TWB internal reference mapping with expression parsing (SUM, AVG, COUNT, YEAR, etc.)
   - `TWBEditor`: lxml-based TWB XML editor supporting:
     - Template loading and field initialization
@@ -297,4 +297,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Package configuration**:
   - `pyproject.toml` with hatchling build backend
-  - `cwtwb` CLI entry point
+  - `twilize` CLI entry point

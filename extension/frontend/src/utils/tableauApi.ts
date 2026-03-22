@@ -52,7 +52,7 @@ export async function extractTableauData(): Promise<{
   }
 
   const dashboard = tableau.extensions.dashboardContent.dashboard
-  console.log(`[cwtwb] Found ${dashboard.worksheets.length} worksheet(s) on dashboard`)
+  console.log(`[twilize] Found ${dashboard.worksheets.length} worksheet(s) on dashboard`)
 
   if (dashboard.worksheets.length === 0) {
     throw new Error(
@@ -63,12 +63,12 @@ export async function extractTableauData(): Promise<{
 
   // Try each worksheet until we find one with data
   for (const worksheet of dashboard.worksheets) {
-    console.log(`[cwtwb] Trying worksheet: ${worksheet.name}`)
+    console.log(`[twilize] Trying worksheet: ${worksheet.name}`)
 
     try {
       // First try getUnderlyingTablesAsync (full data access)
       const tables = await worksheet.getUnderlyingTablesAsync()
-      console.log(`[cwtwb] Worksheet "${worksheet.name}" has ${tables.length} table(s)`)
+      console.log(`[twilize] Worksheet "${worksheet.name}" has ${tables.length} table(s)`)
 
       if (tables.length > 0) {
         const tableData = await worksheet.getUnderlyingTableDataAsync(
@@ -77,7 +77,7 @@ export async function extractTableauData(): Promise<{
         )
 
         console.log(
-          `[cwtwb] Got ${tableData.data.length} rows, ` +
+          `[twilize] Got ${tableData.data.length} rows, ` +
           `${tableData.columns.length} columns from "${worksheet.name}"`
         )
 
@@ -90,16 +90,16 @@ export async function extractTableauData(): Promise<{
       try {
         const summaryData = await worksheet.getSummaryDataAsync({ maxRows: 10000 })
         console.log(
-          `[cwtwb] Summary data: ${summaryData.data.length} rows from "${worksheet.name}"`
+          `[twilize] Summary data: ${summaryData.data.length} rows from "${worksheet.name}"`
         )
         if (summaryData.data.length > 0) {
           return processTableData(summaryData)
         }
       } catch (summaryErr) {
-        console.log(`[cwtwb] getSummaryDataAsync not available for "${worksheet.name}"`)
+        console.log(`[twilize] getSummaryDataAsync not available for "${worksheet.name}"`)
       }
     } catch (err) {
-      console.warn(`[cwtwb] Error reading "${worksheet.name}":`, err)
+      console.warn(`[twilize] Error reading "${worksheet.name}":`, err)
     }
   }
 
@@ -179,8 +179,8 @@ function processTableData(tableData: {
     null_count: nullCounts.get(col.fieldName) ?? 0,
   }))
 
-  console.log(`[cwtwb] Processed ${dataRows.length} rows, ${fields.length} fields`)
-  console.log(`[cwtwb] Fields:`, fields.map(f => `${f.name}(${f.datatype})`).join(', '))
+  console.log(`[twilize] Processed ${dataRows.length} rows, ${fields.length} fields`)
+  console.log(`[twilize] Fields:`, fields.map(f => `${f.name}(${f.datatype})`).join(', '))
 
   return {
     fields,

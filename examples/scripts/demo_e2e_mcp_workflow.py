@@ -3,7 +3,7 @@
 Step 2 / 7  |  Level: ⭐ Beginner
 Demonstrates: Full MCP tool call sequence — create workbook, add a calculated
 field, configure 2 charts (Bar + Pie), assemble into a dashboard, and save.
-This is the canonical "hello world" for the cwtwb SDK.
+This is the canonical "hello world" for the twilize SDK.
 
 Usage:
     python examples/scripts/demo_e2e_mcp_workflow.py
@@ -12,11 +12,11 @@ Usage:
 import sys
 from pathlib import Path
 
-# Add src to path so we can import local cwtwb server tools
+# Add src to path so we can import local twilize server tools
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 # These are the actual tool functions exposed to the LLM via FastMCP
-from cwtwb.server import (
+from twilize.server import (
     create_workbook,
     list_fields,
     add_calculated_field,
