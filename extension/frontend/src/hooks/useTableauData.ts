@@ -5,11 +5,11 @@ import { initTableauExtension, extractTableauData } from '../utils/tableauApi'
 declare const tableau: unknown
 
 const DEMO_FIELDS: FieldInfo[] = [
-  { name: 'Category', datatype: 'string', role: 'dimension', cardinality: 3, sample_values: ['Furniture', 'Technology', 'Office Supplies'] },
-  { name: 'Region', datatype: 'string', role: 'dimension', cardinality: 4, sample_values: ['East', 'West', 'Central', 'South'] },
-  { name: 'Sales', datatype: 'float', role: 'measure', cardinality: 500, sample_values: ['100.5', '250.3', '75.0'] },
-  { name: 'Profit', datatype: 'float', role: 'measure', cardinality: 400, sample_values: ['20.5', '50.3', '15.0'] },
-  { name: 'Order Date', datatype: 'date', role: 'dimension', cardinality: 365, sample_values: ['2024-01-15', '2024-02-20'] },
+  { name: 'Category', datatype: 'string', role: 'dimension', cardinality: 3, sample_values: ['Furniture', 'Technology', 'Office Supplies'], null_count: 0 },
+  { name: 'Region', datatype: 'string', role: 'dimension', cardinality: 4, sample_values: ['East', 'West', 'Central', 'South'], null_count: 0 },
+  { name: 'Sales', datatype: 'float', role: 'measure', cardinality: 500, sample_values: ['100.5', '250.3', '75.0'], null_count: 0 },
+  { name: 'Profit', datatype: 'float', role: 'measure', cardinality: 400, sample_values: ['20.5', '50.3', '15.0'], null_count: 0 },
+  { name: 'Order Date', datatype: 'date', role: 'dimension', cardinality: 365, sample_values: ['2024-01-15', '2024-02-20'], null_count: 0 },
 ]
 
 const DEMO_ROWS: unknown[][] = [

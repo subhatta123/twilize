@@ -56,6 +56,7 @@ from lxml import etree
 from .config import _generate_uuid
 from .dashboard_actions import add_dashboard_action as _add_dashboard_action
 from .dashboard_dependencies import add_dashboard_dependencies
+from .c3_layout import build_c3_zones
 from .dashboard_layouts import (
     render_dashboard_layout,
     resolve_dashboard_layout,
@@ -104,7 +105,13 @@ class DashboardsMixin:
         db = etree.SubElement(dashboards, "dashboard")
         db.set("name", dashboard_name)
 
-        etree.SubElement(db, "style")
+        # Dashboard style — set background color for card-based design
+        db_style = etree.SubElement(db, "style")
+        style_rule = etree.SubElement(db_style, "style-rule")
+        style_rule.set("element", "table")
+        fmt = etree.SubElement(style_rule, "format")
+        fmt.set("attr", "background-color")
+        fmt.set("value", "#dce8f0")
 
         size_el = etree.SubElement(db, "size")
         size_el.set("maxheight", str(height))
@@ -116,7 +123,30 @@ class DashboardsMixin:
         zones = etree.SubElement(db, "zones")
 
         worksheet_options = {}
-        if worksheet_names or isinstance(layout, dict) or isinstance(layout, str):
+
+        # Check for C3 direct template (bypasses FlexNode for exact Tableau layout)
+        print(f"[DASHBOARD] layout type={type(layout).__name__}, is_c3={isinstance(layout, dict) and layout.get('_c3_template', False)}")
+        if isinstance(layout, dict) and layout.get("_c3_template"):
+            build_c3_zones(
+                zones,
+                self._next_zone_id,
+                title=layout.get("_title", dashboard_name),
+                kpi_names=layout.get("_kpi_names", []),
+                chart_names=layout.get("_chart_names", []),
+                filters=layout.get("_filters"),
+                filter_worksheet=layout.get("_filter_worksheet", ""),
+                field_registry=self.field_registry,
+                editor=self,
+            )
+            # Build deps from all worksheet names (including filter metadata)
+            all_ws = layout.get("_kpi_names", []) + layout.get("_chart_names", [])
+            self._add_c3_dashboard_deps(
+                db,
+                all_ws,
+                filters=layout.get("_filters"),
+                filter_worksheet=layout.get("_filter_worksheet", ""),
+            )
+        elif worksheet_names or isinstance(layout, dict) or isinstance(layout, str):
             layout_dict = resolve_dashboard_layout(layout, worksheet_names)
             validate_layout_worksheets(layout_dict)
             worksheet_options = extract_layout_options(layout_dict)
@@ -150,6 +180,41 @@ class DashboardsMixin:
 
     def _add_dashboard_deps(self, db: etree._Element, layout_dict: dict) -> None:
         """Compatibility wrapper for dashboard dependency generation."""
+        add_dashboard_dependencies(self, db, layout_dict)
+
+    def _add_c3_dashboard_deps(
+        self,
+        db: etree._Element,
+        worksheet_names: list[str],
+        filters: list[dict] | None = None,
+        filter_worksheet: str = "",
+    ) -> None:
+        """Add dashboard dependencies for C3 direct template.
+
+        The dependency generator looks for ``type: "filter"`` children in the
+        layout dict to decide whether ``<datasources>`` and
+        ``<datasource-dependencies>`` blocks are needed.  The previous
+        implementation only emitted ``type: "worksheet"`` entries, which meant
+        dashboard filter zones had no backing datasource metadata and were
+        invisible in Tableau.
+        """
+        children: list[dict] = [
+            {"type": "worksheet", "name": n} for n in worksheet_names
+        ]
+        # Include filter nodes so the dependency generator adds the required
+        # <datasources> and <datasource-dependencies> to the dashboard XML.
+        for f in (filters or []):
+            field_name = f.get("field") or f.get("column", "")
+            children.append({
+                "type": "filter",
+                "field": field_name,
+                "worksheet": filter_worksheet,
+            })
+        layout_dict = {
+            "type": "container",
+            "direction": "vertical",
+            "children": children,
+        }
         add_dashboard_dependencies(self, db, layout_dict)
 
     def add_dashboard_action(

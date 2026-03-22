@@ -120,11 +120,16 @@ function processTableData(tableData: {
 } {
   const uniqueValues: Map<string, Set<string>> = new Map()
   const sampleValues: Map<string, string[]> = new Map()
+  const nullCounts: Map<string, number> = new Map()
 
   for (const col of tableData.columns) {
     uniqueValues.set(col.fieldName, new Set())
     sampleValues.set(col.fieldName, [])
+    nullCounts.set(col.fieldName, 0)
   }
+
+  // Null sentinel values that indicate missing/unknown data
+  const NULL_SENTINELS = new Set(['', 'null', 'none', 'na', 'n/a', 'nan', '%null%', 'unknown'])
 
   const dataRows: unknown[][] = []
   for (const row of tableData.data) {
@@ -145,6 +150,16 @@ function processTableData(tableData: {
 
       rowValues.push(val)
 
+      // Count nulls from ALL rows (not just sample)
+      if (val === null || val === undefined) {
+        nullCounts.set(col.fieldName, (nullCounts.get(col.fieldName) ?? 0) + 1)
+      } else {
+        const strLower = String(val).trim().toLowerCase()
+        if (NULL_SENTINELS.has(strLower)) {
+          nullCounts.set(col.fieldName, (nullCounts.get(col.fieldName) ?? 0) + 1)
+        }
+      }
+
       const strVal = String(val)
       uniqueValues.get(col.fieldName)!.add(strVal)
       const samples = sampleValues.get(col.fieldName)!
@@ -161,6 +176,7 @@ function processTableData(tableData: {
     role: '',
     cardinality: uniqueValues.get(col.fieldName)?.size ?? 0,
     sample_values: sampleValues.get(col.fieldName) ?? [],
+    null_count: nullCounts.get(col.fieldName) ?? 0,
   }))
 
   console.log(`[cwtwb] Processed ${dataRows.length} rows, ${fields.length} fields`)

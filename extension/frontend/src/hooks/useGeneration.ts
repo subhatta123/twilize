@@ -14,11 +14,14 @@ export function useGeneration() {
       rowCount: number,
       prompt: string,
       imageBase64: string,
+      dataRows: unknown[][] = [],
     ): Promise<DashboardPlan | null> => {
       setSuggesting(true)
       setError('')
       try {
-        const plan = await suggestDashboard(fields, rowCount, prompt, imageBase64)
+        // Send first 30 rows as sample for statistical analysis
+        const sampleRows = dataRows.slice(0, 30)
+        const plan = await suggestDashboard(fields, rowCount, prompt, imageBase64, 5, sampleRows)
         return plan
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Suggestion failed')

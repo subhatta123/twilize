@@ -26,10 +26,21 @@ export default function SuggestionPreview({ plan, loading, onAccept, onRegenerat
     return <div style={styles.loading}>Analyzing data and generating suggestions...</div>
   }
 
+  const warning = (plan as any)._warning as string | undefined
+  const engine = (plan as any)._engine as string | undefined
+
   return (
     <div>
       <h2 style={styles.planTitle}>{plan.title}</h2>
-      <div style={styles.layoutBadge}>Layout: {plan.layout}</div>
+      <div style={styles.layoutBadge}>
+        Layout: {plan.layout}
+        {engine && <span style={{ marginLeft: 8, color: engine === 'llm' ? '#16a34a' : '#d97706' }}>
+          ({engine === 'llm' ? 'AI-powered' : 'Rule-based'})
+        </span>}
+      </div>
+      {warning && (
+        <div style={styles.warning}>{warning}</div>
+      )}
 
       <div style={styles.chartList}>
         {plan.charts.map((chart, i) => (
@@ -92,6 +103,15 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#3367d6',
   },
   reason: { fontSize: 12, color: '#666', fontStyle: 'italic' },
+  warning: {
+    padding: '8px 12px',
+    backgroundColor: '#fffbeb',
+    border: '1px solid #f59e0b',
+    borderRadius: 6,
+    color: '#92400e',
+    fontSize: 12,
+    marginBottom: 12,
+  },
   actions: { display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' },
   primaryBtn: { padding: '10px 20px', backgroundColor: '#4E79A7', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 },
   secondaryBtn: { padding: '10px 20px', backgroundColor: '#f0f0f0', color: '#333', border: '1px solid #ddd', borderRadius: 6, cursor: 'pointer' },

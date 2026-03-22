@@ -66,16 +66,32 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
     temporal = schema.temporal
     geographic = schema.geographic
 
+    # --- Always add KPI summaries for top measures ---
+    # Generate up to 4 KPIs when enough measures exist (fills KPI row)
+    kpi_limit = min(4, len(measures))
+    for m in measures[:kpi_limit]:
+        agg = smart_aggregation(m.spec.name)
+        kpi_title = _kpi_title(agg, m.spec.name)
+        suggestions.append(ChartSuggestion(
+            chart_type="Text",
+            title=kpi_title,
+            shelves=[
+                ShelfAssignment(m.spec.name, "label", agg),
+            ],
+            reason="Key metric summary KPI",
+            priority=95,
+        ))
+
     # --- Temporal + Measure → Line chart ---
     if temporal and measures:
         time_col = temporal[0]
         for m in measures[:2]:
             suggestions.append(ChartSuggestion(
                 chart_type="Line",
-                title=f"{m.spec.name} over {time_col.spec.name}",
+                title=f"How has {m.spec.name} trended over time?",
                 shelves=[
                     ShelfAssignment(time_col.spec.name, "columns"),
-                    ShelfAssignment(m.spec.name, "rows", "SUM"),
+                    ShelfAssignment(m.spec.name, "rows", smart_aggregation(m.spec.name)),
                 ],
                 reason="Temporal dimension with numeric measure → line chart",
                 priority=90,
@@ -91,10 +107,10 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
         m = measures[0]
         suggestions.append(ChartSuggestion(
             chart_type="Line",
-            title=f"{m.spec.name} by {color_dim.spec.name} over time",
+            title=f"How does {m.spec.name} differ by {color_dim.spec.name} over time?",
             shelves=[
                 ShelfAssignment(time_col.spec.name, "columns"),
-                ShelfAssignment(m.spec.name, "rows", "SUM"),
+                ShelfAssignment(m.spec.name, "rows", smart_aggregation(m.spec.name)),
                 ShelfAssignment(color_dim.spec.name, "color"),
             ],
             reason="Time series with categorical breakdown → colored line chart",
@@ -107,10 +123,10 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
         m = measures[0]
         suggestions.append(ChartSuggestion(
             chart_type="Bar",
-            title=f"{m.spec.name} by {dim.spec.name}",
+            title=f"Which {dim.spec.name} has the highest {m.spec.name}?",
             shelves=[
                 ShelfAssignment(dim.spec.name, "rows"),
-                ShelfAssignment(m.spec.name, "columns", "SUM"),
+                ShelfAssignment(m.spec.name, "columns", smart_aggregation(m.spec.name)),
             ],
             reason="Categorical dimension with numeric measure → horizontal bar chart",
             priority=80,
@@ -120,14 +136,14 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
     if len(measures) >= 2:
         m1, m2 = measures[0], measures[1]
         shelves = [
-            ShelfAssignment(m1.spec.name, "columns", "SUM"),
-            ShelfAssignment(m2.spec.name, "rows", "SUM"),
+            ShelfAssignment(m1.spec.name, "columns", smart_aggregation(m1.spec.name)),
+            ShelfAssignment(m2.spec.name, "rows", smart_aggregation(m2.spec.name)),
         ]
         if cat_dims:
             shelves.append(ShelfAssignment(cat_dims[0].spec.name, "color"))
         suggestions.append(ChartSuggestion(
             chart_type="Scatterplot",
-            title=f"{m1.spec.name} vs {m2.spec.name}",
+            title=f"Is there a relationship between {m1.spec.name} and {m2.spec.name}?",
             shelves=shelves,
             reason="Two numeric measures → scatter plot",
             priority=70,
@@ -139,10 +155,10 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
         m = measures[0]
         suggestions.append(ChartSuggestion(
             chart_type="Map",
-            title=f"{m.spec.name} by {geo.spec.name}",
+            title=f"Where is {m.spec.name} concentrated?",
             shelves=[
                 ShelfAssignment(geo.spec.name, "detail"),
-                ShelfAssignment(m.spec.name, "color", "SUM"),
+                ShelfAssignment(m.spec.name, "color", smart_aggregation(m.spec.name)),
             ],
             reason="Geographic dimension with measure → filled map",
             priority=75,
@@ -155,9 +171,9 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
         m = measures[0]
         suggestions.append(ChartSuggestion(
             chart_type="Pie",
-            title=f"{m.spec.name} distribution by {dim.spec.name}",
+            title=f"How is {m.spec.name} split across {dim.spec.name}?",
             shelves=[
-                ShelfAssignment(m.spec.name, "size", "SUM"),
+                ShelfAssignment(m.spec.name, "size", smart_aggregation(m.spec.name)),
                 ShelfAssignment(dim.spec.name, "color"),
             ],
             reason="Low-cardinality categorical with measure → pie chart",
@@ -171,11 +187,11 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
         m = measures[0]
         suggestions.append(ChartSuggestion(
             chart_type="Heatmap",
-            title=f"{m.spec.name}: {d1.spec.name} × {d2.spec.name}",
+            title=f"How does {m.spec.name} vary across {d1.spec.name} and {d2.spec.name}?",
             shelves=[
                 ShelfAssignment(d1.spec.name, "columns"),
                 ShelfAssignment(d2.spec.name, "rows"),
-                ShelfAssignment(m.spec.name, "color", "SUM"),
+                ShelfAssignment(m.spec.name, "color", smart_aggregation(m.spec.name)),
             ],
             reason="Two categorical dimensions with measure → heatmap",
             priority=55,
@@ -187,28 +203,17 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
         m1, m2 = measures[0], measures[1]
         suggestions.append(ChartSuggestion(
             chart_type="Bar",
-            title=f"{m1.spec.name} and {m2.spec.name} by {dim.spec.name}",
+            title=f"How do {m1.spec.name} and {m2.spec.name} compare by {dim.spec.name}?",
             shelves=[
                 ShelfAssignment(dim.spec.name, "rows"),
-                ShelfAssignment(m1.spec.name, "columns", "SUM"),
-                ShelfAssignment(m2.spec.name, "columns", "SUM"),
+                ShelfAssignment(m1.spec.name, "columns", smart_aggregation(m1.spec.name)),
+                ShelfAssignment(m2.spec.name, "columns", smart_aggregation(m2.spec.name)),
             ],
             reason="Category with multiple measures → grouped bar chart",
             priority=50,
         ))
 
-    # --- Single measure, no dims → KPI / text ---
-    if measures and not cat_dims and not temporal:
-        m = measures[0]
-        suggestions.append(ChartSuggestion(
-            chart_type="Text",
-            title=f"Total {m.spec.name}",
-            shelves=[
-                ShelfAssignment(m.spec.name, "label", "SUM"),
-            ],
-            reason="Single measure with no dimensions → KPI text",
-            priority=40,
-        ))
+    # KPIs are now always added at the top (priority=95)
 
     # --- Categorical dim (high cardinality) + Measure → Treemap ---
     high_cat = [d for d in cat_dims if d.spec.cardinality > 8]
@@ -217,17 +222,21 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
         m = measures[0]
         suggestions.append(ChartSuggestion(
             chart_type="Tree Map",
-            title=f"{m.spec.name} by {dim.spec.name}",
+            title=f"How is {m.spec.name} distributed across {dim.spec.name}?",
             shelves=[
                 ShelfAssignment(dim.spec.name, "detail"),
-                ShelfAssignment(m.spec.name, "size", "SUM"),
+                ShelfAssignment(m.spec.name, "size", smart_aggregation(m.spec.name)),
                 ShelfAssignment(dim.spec.name, "color"),
             ],
             reason="High-cardinality categorical with measure → treemap",
             priority=45,
         ))
 
-    # Sort by priority and trim
+    # Replace fixed priorities with data-driven story scores
+    for s in suggestions:
+        s.priority = _story_score(s.chart_type, schema, s.shelves)
+
+    # Sort by story score and trim
     suggestions.sort(key=lambda s: s.priority, reverse=True)
 
     # --- Best practice: temporal guard ---
@@ -248,25 +257,8 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
         ]
 
     # --- Best practice: deduplicate chart types ---
-    # Allow max 2 of the same type, and only if primary axis fields differ
-    deduped: list[ChartSuggestion] = []
-    type_count: dict[str, int] = {}
-    type_fields: dict[str, list[set[str]]] = {}
-    for s in suggestions:
-        ct = s.chart_type
-        primary_fields = {sh.field_name for sh in s.shelves if sh.shelf in ("columns", "rows")}
-        if ct not in type_count:
-            type_count[ct] = 0
-            type_fields[ct] = []
-        if type_count[ct] >= 2:
-            continue
-        # Skip if same primary fields already exist for this type
-        if any(primary_fields == existing for existing in type_fields[ct]):
-            continue
-        type_count[ct] += 1
-        type_fields[ct].append(primary_fields)
-        deduped.append(s)
-    suggestions = deduped[:max_charts]
+    suggestions = deduplicate_charts(suggestions, max_per_type=2)
+    suggestions = suggestions[:max_charts]
 
     # Determine layout
     n = len(suggestions)
@@ -293,6 +285,55 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
     )
 
 
+def deduplicate_charts(
+    charts: list[ChartSuggestion],
+    max_per_type: int = 2,
+) -> list[ChartSuggestion]:
+    """Remove duplicate charts that show the same data in the same way.
+
+    Allows up to ``max_per_type`` charts of each type, and only if their
+    primary axis fields AND full shelf signatures differ.  This prevents
+    two Bar charts with the same dimension + same measure from both
+    appearing even when generated by different suggestion rules.
+    """
+    deduped: list[ChartSuggestion] = []
+    type_count: dict[str, int] = {}
+    type_sigs: dict[str, list[tuple[frozenset, frozenset]]] = {}
+
+    for s in charts:
+        ct = s.chart_type
+        primary_fields = frozenset(
+            sh.field_name for sh in s.shelves if sh.shelf in ("columns", "rows")
+        )
+        # Also consider label shelf for Text/KPI charts (they have no columns/rows)
+        if not primary_fields:
+            primary_fields = frozenset(
+                sh.field_name for sh in s.shelves if sh.shelf == "label"
+            )
+        full_sig = frozenset(
+            (sh.field_name, sh.shelf, sh.aggregation) for sh in s.shelves
+        )
+
+        if ct not in type_count:
+            type_count[ct] = 0
+            type_sigs[ct] = []
+        # Allow more KPI/Text charts since they're compact and high-value
+        effective_max = max_per_type * 2 if ct == "Text" else max_per_type
+        if type_count[ct] >= effective_max:
+            continue
+        # Reject if primary fields match OR full shelf signature matches
+        if any(
+            primary_fields == ep or full_sig == es
+            for ep, es in type_sigs[ct]
+        ):
+            continue
+
+        type_count[ct] += 1
+        type_sigs[ct].append((primary_fields, full_sig))
+        deduped.append(s)
+    return deduped
+
+
 def format_suggestions(suggestion: DashboardSuggestion) -> str:
     """Format dashboard suggestion as a human-readable summary."""
     lines = [f"=== Dashboard: {suggestion.title} (layout: {suggestion.layout}) ===\n"]
@@ -309,19 +350,189 @@ def format_suggestions(suggestion: DashboardSuggestion) -> str:
     return "\n".join(lines)
 
 
-_COUNT_KEYWORDS = {"count", "quantity", "number", "num_", "qty", "n_", "total_count"}
+_RATE_KEYWORDS = {
+    "discount", "margin", "rate", "ratio", "percentage", "pct",
+    "share", "yield", "efficiency", "utilization", "conversion",
+    "bounce", "churn", "retention", "satisfaction", "score", "rating",
+    "avg", "average", "mean",
+}
+
+_AMOUNT_KEYWORDS = {
+    "sales", "profit", "revenue", "cost", "price", "amount",
+    "total", "budget", "spend", "income", "expense", "fee",
+    "tax", "value", "balance", "payment",
+}
+
+_COUNT_KEYWORDS = {
+    "count", "quantity", "number", "num_", "qty", "n_",
+    "total_count", "orders", "transactions", "visits", "clicks",
+}
+
+_ID_KEYWORDS = {"id", "key", "code", "identifier", "uuid"}
 
 
-def _default_aggregation(field_name: str) -> str:
-    """Return the best default aggregation for a measure field.
+def smart_aggregation(field_name: str) -> str:
+    """Choose the correct aggregation for a measure based on field semantics.
 
-    Count-like fields get COUNT; everything else gets SUM.
+    Priority: Rate → ID → Count → Amount → fallback SUM.
+
+    * Rates/percentages (discount, margin, score) → ``AVG``
+    * Identifiers (order id, customer key) → ``COUNTD``
+    * Count-like fields (quantity, num_orders) → ``SUM``
+    * Amounts (sales, profit, revenue) → ``SUM``
+    * Unknown → ``SUM``
     """
     lower = field_name.lower()
+
+    # Rate / percentage fields → AVG
+    for kw in _RATE_KEYWORDS:
+        if kw in lower:
+            return "AVG"
+
+    # ID / identifier fields → COUNTD
+    for kw in _ID_KEYWORDS:
+        if kw in lower:
+            return "COUNTD"
+
+    # Count-like fields → SUM (summing counts is valid)
     for kw in _COUNT_KEYWORDS:
         if kw in lower:
-            return "COUNT"
+            return "SUM"
+
+    # Amount fields → SUM (explicit match)
+    for kw in _AMOUNT_KEYWORDS:
+        if kw in lower:
+            return "SUM"
+
+    # Default
     return "SUM"
+
+
+# Keep backward-compatible alias
+_default_aggregation = smart_aggregation
+
+
+def _kpi_title(aggregation: str, field_name: str) -> str:
+    """Generate a KPI title that reflects the chosen aggregation."""
+    _AGG_LABELS = {
+        "SUM": "Total",
+        "AVG": "Average",
+        "COUNT": "Count of",
+        "COUNTD": "Distinct",
+        "MIN": "Minimum",
+        "MAX": "Maximum",
+    }
+    label = _AGG_LABELS.get(aggregation, "Total")
+    return f"{label} {field_name}"
+
+
+def _story_score(
+    chart_type: str,
+    schema: ClassifiedSchema,
+    shelves: list[ShelfAssignment],
+) -> int:
+    """Score a chart suggestion by its analytical story value.
+
+    Instead of fixed priorities per chart type, this evaluates how well
+    the *data* supports the analytical pattern the chart represents.
+    Higher scores mean stronger data support.
+    """
+    dims = schema.dimensions
+    measures = schema.measures
+    temporal = schema.temporal
+    geographic = schema.geographic
+    cat_dims = [d for d in dims if d.semantic_type == "categorical"]
+
+    if chart_type == "Text":
+        # KPIs always provide immediate context — high value
+        return 95
+
+    if chart_type == "Line":
+        if temporal:
+            time_card = temporal[0].spec.cardinality
+            if time_card >= 6:
+                return 92  # Strong temporal story
+            elif time_card >= 3:
+                return 82  # Moderate temporal story
+        return 40  # No temporal data — line chart is weak
+
+    if chart_type == "Bar":
+        if cat_dims:
+            best_card = max(d.spec.cardinality for d in cat_dims)
+            if 3 <= best_card <= 15:
+                return 85  # Sweet spot for ranking/comparison
+            elif best_card <= 2:
+                return 55  # Too few categories
+            else:
+                return 70  # High cardinality — still works
+        return 35
+
+    if chart_type == "Scatterplot":
+        if len(measures) >= 2:
+            # Estimate visual data points: when a categorical dim is used as
+            # color/detail, the scatter shows one aggregated point per category
+            # — NOT one per raw row.  We need enough *distinct* points for a
+            # meaningful correlation view.
+            color_dims = [
+                sh for sh in shelves
+                if sh.shelf in ("color", "detail") and not sh.aggregation
+            ]
+            if color_dims:
+                # Find the cardinality of the color/detail dimension
+                color_name = color_dims[0].field_name
+                color_col = next(
+                    (d for d in cat_dims if d.spec.name == color_name), None
+                )
+                visual_points = color_col.spec.cardinality if color_col else schema.row_count
+            else:
+                visual_points = schema.row_count
+
+            if visual_points >= 15:
+                return 78  # Enough points for correlation
+            elif visual_points >= 6:
+                return 60  # Marginal — small scatter
+            return 35  # Too few visual points for meaningful scatter
+        return 30
+
+    if chart_type == "Map":
+        if geographic:
+            geo = geographic[0]
+            total = geo.spec.total_rows or schema.row_count
+            if total > 0:
+                null_ratio = geo.spec.null_count / total
+                if null_ratio < 0.10:
+                    return 80  # Good geographic data
+                elif null_ratio < 0.20:
+                    return 60  # Marginal quality
+                return 20  # Too many nulls — story is weak
+            return 70  # Can't determine quality
+        return 10  # No geographic fields
+
+    if chart_type == "Pie":
+        small_cats = [d for d in cat_dims if d.spec.cardinality <= 5]
+        if small_cats:
+            return 65
+        elif cat_dims and min(d.spec.cardinality for d in cat_dims) <= 6:
+            return 55
+        return 25
+
+    if chart_type == "Heatmap":
+        if len(cat_dims) >= 2:
+            return 60
+        return 20
+
+    if chart_type == "Tree Map":
+        high_cat = [d for d in cat_dims if d.spec.cardinality > 8]
+        if high_cat:
+            return 55
+        return 30
+
+    if chart_type == "Area":
+        if temporal:
+            return 75
+        return 35
+
+    return 50  # default for unknown chart types
 
 
 def _best_categorical_dim(dims: list[ClassifiedColumn]) -> ClassifiedColumn:
@@ -341,6 +552,52 @@ def _best_categorical_dim(dims: list[ClassifiedColumn]) -> ClassifiedColumn:
         scored.append((score, d))
     scored.sort(key=lambda x: x[0], reverse=True)
     return scored[0][1]
+
+
+def _auto_detect_theme(schema: ClassifiedSchema) -> str:
+    """Pick a theme based on data domain heuristics.
+
+    Examines field names for domain-specific keywords to select
+    the most appropriate visual theme.
+    """
+    field_names = " ".join(c.spec.name.lower() for c in schema.columns)
+
+    # Financial / business data → corporate-blue
+    _CORPORATE_KW = (
+        "revenue", "budget", "fiscal", "quarter", "finance",
+        "sales", "profit", "margin", "cost", "price", "order",
+        "invoice", "payment", "discount", "customer", "account",
+    )
+    if any(kw in field_names for kw in _CORPORATE_KW):
+        return "corporate-blue"
+
+    # Marketing / consumer data → vibrant
+    _VIBRANT_KW = (
+        "click", "impression", "campaign", "conversion", "ad",
+        "visitor", "bounce", "session", "pageview", "engagement",
+        "subscriber", "follower", "reach", "brand",
+    )
+    if any(kw in field_names for kw in _VIBRANT_KW):
+        return "vibrant"
+
+    # Ops / monitoring data → dark
+    _DARK_KW = (
+        "sensor", "uptime", "latency", "error", "cpu", "memory",
+        "throughput", "request", "response", "alert", "incident",
+        "log", "metric", "node", "cluster",
+    )
+    if any(kw in field_names for kw in _DARK_KW):
+        return "dark"
+
+    # Environmental / sustainability data → minimal
+    _MINIMAL_KW = (
+        "emission", "carbon", "energy", "renewable", "waste",
+        "recycle", "sustain", "environment", "green", "climate",
+    )
+    if any(kw in field_names for kw in _MINIMAL_KW):
+        return "minimal"
+
+    return "modern-light"
 
 
 def _derive_title(schema: ClassifiedSchema) -> str:

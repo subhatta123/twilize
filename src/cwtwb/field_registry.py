@@ -176,8 +176,21 @@ class FieldRegistry:
             field_name = expr.strip()
             derivation = "None"
 
-        # Look up the field
-        fi = self._find_field(field_name)
+        # Look up the field — if the inner name fails, try the full
+        # expression as a literal field name (handles fields like
+        # "YEAR(Order Date)" that are actual column names, not aggregations)
+        try:
+            fi = self._find_field(field_name)
+        except KeyError:
+            if m:
+                # The full expr might be a literal field name
+                try:
+                    fi = self._find_field(expr.strip())
+                    derivation = "None"  # Not an aggregation — literal name
+                except KeyError:
+                    raise  # Re-raise original error
+            else:
+                raise
 
         # Calculated measures use derivation="User" (abbr: usr).
         # Calculated dimensions (boolean, nominal) keep derivation="None" so they

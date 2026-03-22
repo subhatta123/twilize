@@ -4,6 +4,7 @@ export interface FieldInfo {
   role: string
   cardinality: number
   sample_values: string[]
+  null_count: number
 }
 
 export interface ShelfAssignment {

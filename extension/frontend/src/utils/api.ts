@@ -7,7 +7,8 @@ export async function suggestDashboard(
   rowCount: number,
   prompt: string,
   imageBase64: string,
-  maxCharts: number = 6,
+  maxCharts: number = 5,
+  sampleRows: unknown[][] = [],
 ): Promise<DashboardPlan> {
   const response = await fetch(`${BASE_URL}/suggest`, {
     method: 'POST',
@@ -19,11 +20,13 @@ export async function suggestDashboard(
         role: f.role,
         cardinality: f.cardinality,
         sample_values: f.sample_values,
+        null_count: f.null_count ?? 0,
       })),
       prompt,
       row_count: rowCount,
       max_charts: maxCharts,
       image_base64: imageBase64,
+      sample_rows: sampleRows,
     }),
   })
 
@@ -48,6 +51,7 @@ export async function generateWorkbook(
         datatype: f.datatype,
         role: f.role,
         cardinality: f.cardinality,
+        null_count: f.null_count ?? 0,
       })),
       data_rows: dataRows,
       plan,
@@ -66,6 +70,28 @@ export async function checkHealth(): Promise<boolean> {
   try {
     const response = await fetch(`${BASE_URL}/health`)
     return response.ok
+  } catch {
+    return false
+  }
+}
+
+export async function setApiKey(key: string): Promise<void> {
+  const response = await fetch(`${BASE_URL}/set-key`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ api_key: key }),
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to set API key: ${response.statusText}`)
+  }
+}
+
+export async function getKeyStatus(): Promise<boolean> {
+  try {
+    const response = await fetch(`${BASE_URL}/key-status`)
+    if (!response.ok) return false
+    const data = await response.json()
+    return data.configured === true
   } catch {
     return false
   }

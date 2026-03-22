@@ -87,7 +87,51 @@ def setup_table_style(table: etree._Element, mark_type: str) -> None:
 
     table_style = _get_or_create_table_style(table)
 
-    if mark_type in ("Tree Map", "Bubble Chart"):
+    if mark_type == "Text":
+        # BAN (Big Ass Number) styling for KPI text charts
+        cell_rule = etree.SubElement(table_style, "style-rule")
+        cell_rule.set("element", "cell")
+        for attr, val in (
+            ("text-align", "center"),
+            ("font-weight", "bold"),
+            ("font-size", "28"),
+            ("font-family", "Tableau Book"),
+        ):
+            fmt = etree.SubElement(cell_rule, "format")
+            fmt.set("attr", attr)
+            fmt.set("value", val)
+
+        label_rule = etree.SubElement(table_style, "style-rule")
+        label_rule.set("element", "label")
+        for attr, val in (
+            ("text-align", "center"),
+            ("font-size", "14"),
+            ("font-family", "Tableau Book"),
+            ("color", "#666666"),
+        ):
+            fmt = etree.SubElement(label_rule, "format")
+            fmt.set("attr", attr)
+            fmt.set("value", val)
+
+        # Hide grid lines and dividers for clean KPI look
+        div_rule = etree.SubElement(table_style, "style-rule")
+        div_rule.set("element", "table-div")
+        for scope in ("rows", "cols"):
+            fmt = etree.SubElement(div_rule, "format")
+            fmt.set("attr", "line-visibility")
+            fmt.set("scope", scope)
+            fmt.set("value", "off")
+
+        # Hide axis labels
+        ws_rule = etree.SubElement(table_style, "style-rule")
+        ws_rule.set("element", "worksheet")
+        for scope in ("cols", "rows"):
+            fmt = etree.SubElement(ws_rule, "format")
+            fmt.set("attr", "display-field-labels")
+            fmt.set("scope", scope)
+            fmt.set("value", "false")
+
+    elif mark_type in ("Tree Map", "Bubble Chart"):
         axis_rule = etree.SubElement(table_style, "style-rule")
         axis_rule.set("element", "axis")
         fmt = etree.SubElement(axis_rule, "format")
@@ -524,14 +568,24 @@ def apply_measure_values(
 
     cell_rule = etree.SubElement(table_style, "style-rule")
     cell_rule.set("element", "cell")
-    for attr, val in (("text-align", "center"), ("font-weight", "bold"), ("font-size", "12")):
+    for attr, val in (
+        ("text-align", "center"),
+        ("font-weight", "bold"),
+        ("font-size", "28"),          # BAN: Big Ass Number — large, prominent
+        ("font-family", "Tableau Book"),
+    ):
         fmt = etree.SubElement(cell_rule, "format")
         fmt.set("attr", attr)
         fmt.set("value", val)
 
     label_rule = etree.SubElement(table_style, "style-rule")
     label_rule.set("element", "label")
-    for attr, val in (("text-align", "center"), ("font-size", "10")):
+    for attr, val in (
+        ("text-align", "center"),
+        ("font-size", "14"),           # Subtitle label below the number
+        ("font-family", "Tableau Book"),
+        ("color", "#666666"),     # Muted gray for context
+    ):
         fmt = etree.SubElement(label_rule, "format")
         fmt.set("attr", attr)
         fmt.set("value", val)

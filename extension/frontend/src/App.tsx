@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
+import ApiKeySettings from './components/ApiKeySettings'
 import DataPreview from './components/DataPreview'
 import PromptInput from './components/PromptInput'
-import ImageUpload from './components/ImageUpload'
 import SuggestionPreview from './components/SuggestionPreview'
 import ProgressIndicator from './components/ProgressIndicator'
 import DownloadPanel from './components/DownloadPanel'
@@ -14,7 +14,6 @@ type Step = 'data' | 'prompt' | 'preview' | 'generating' | 'download'
 export default function App() {
   const [step, setStep] = useState<Step>('data')
   const [prompt, setPrompt] = useState('')
-  const [imageBase64, setImageBase64] = useState('')
   const [plan, setPlan] = useState<DashboardPlan | null>(null)
 
   const { fields, dataRows, rowCount, loading: dataLoading, error: dataError, reload } = useTableauData()
@@ -22,7 +21,7 @@ export default function App() {
 
   const handleSuggest = async () => {
     setStep('preview')
-    const suggested = await generate.suggest(fields, rowCount, prompt, imageBase64)
+    const suggested = await generate.suggest(fields, rowCount, prompt, '', dataRows)
     if (suggested) {
       setPlan(suggested)
     }
@@ -44,7 +43,9 @@ export default function App() {
 
   return (
     <div style={styles.container}>
-      <h1 style={styles.title}>cwtwb Dashboard Builder</h1>
+      <h1 style={styles.title}>Twilize Dashboard Builder</h1>
+
+      <ApiKeySettings />
 
       {step === 'data' && (
         <DataPreview
@@ -62,10 +63,6 @@ export default function App() {
           <PromptInput
             prompt={prompt}
             onChange={setPrompt}
-          />
-          <ImageUpload
-            onImageCapture={setImageBase64}
-            hasImage={!!imageBase64}
           />
           <div style={styles.actions}>
             <button style={styles.secondaryBtn} onClick={() => setStep('data')}>

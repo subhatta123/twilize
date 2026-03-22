@@ -28,13 +28,35 @@ from .image_analysis import analyze_reference_image
 from .pipeline import generate_workbook
 from .schema_inference import TableauField
 
+# Configure logging so all warnings/errors are visible on the console
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s [%(name)s] %(message)s",
+)
+
+# Load .env file if present (for API keys)
+_env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+if _env_path.exists():
+    for line in _env_path.read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and value:
+                # Use direct assignment — setdefault won't overwrite
+                # empty strings left by prior `setx` / `set` commands
+                if not os.environ.get(key):
+                    os.environ[key] = value
+
 
 class SuggestRequest(BaseModel):
     fields: list[dict]
     prompt: str = ""
     row_count: int = 0
-    max_charts: int = 5
+    max_charts: int = 8
     image_base64: str = ""
+    sample_rows: list[list[Any]] = []
 
 
 class GenerateRequest(BaseModel):
@@ -73,6 +95,7 @@ async def suggest(req: SuggestRequest) -> JSONResponse:
             role=f.get("role", ""),
             cardinality=f.get("cardinality", 0),
             sample_values=f.get("sample_values", []),
+            null_count=f.get("null_count", 0),
         )
         for f in req.fields
     ]
@@ -87,7 +110,25 @@ async def suggest(req: SuggestRequest) -> JSONResponse:
         prompt=req.prompt,
         image_analysis=image_analysis,
         max_charts=req.max_charts,
+        sample_rows=req.sample_rows or None,
     )
+
+    # Tag response with engine info — if _warning is set, LLM failed
+    has_api_key = bool(
+        os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    )
+    # If plan already has _warning from suggest_dashboard, LLM failed
+    if plan.get("_warning"):
+        plan["_engine"] = "rules"
+    elif has_api_key:
+        plan["_engine"] = "llm"
+    else:
+        plan["_engine"] = "rules"
+        plan["_warning"] = (
+            "No LLM API key configured. Dashboard was generated using rule-based "
+            "fallback. Set ANTHROPIC_API_KEY via the API Key Settings panel "
+            "for AI-powered dashboards."
+        )
 
     return JSONResponse(content=plan)
 
@@ -105,6 +146,7 @@ async def generate(req: GenerateRequest) -> FileResponse:
                 datatype=f.get("datatype", "string"),
                 role=f.get("role", ""),
                 cardinality=f.get("cardinality", 0),
+                null_count=f.get("null_count", 0),
             )
             for f in req.fields
         ]
@@ -136,6 +178,30 @@ async def status(job_id: str) -> JSONResponse:
     if job_id not in _jobs:
         raise HTTPException(status_code=404, detail="Job not found")
     return JSONResponse(content=_jobs[job_id])
+
+
+class SetKeyRequest(BaseModel):
+    api_key: str
+
+
+@app.post("/api/set-key")
+async def set_key(req: SetKeyRequest) -> JSONResponse:
+    """Store the API key in the process environment."""
+    key = req.api_key.strip()
+    if not key:
+        raise HTTPException(status_code=400, detail="API key must not be empty")
+    os.environ["ANTHROPIC_API_KEY"] = key
+    logger.info("ANTHROPIC_API_KEY updated via /api/set-key")
+    return JSONResponse(content={"ok": True})
+
+
+@app.get("/api/key-status")
+async def key_status() -> JSONResponse:
+    """Return whether an API key is configured (never expose the key itself)."""
+    configured = bool(
+        os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    )
+    return JSONResponse(content={"configured": configured})
 
 
 @app.get("/api/health")

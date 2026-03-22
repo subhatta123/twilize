@@ -24,6 +24,11 @@ from cwtwb.csv_to_hyper import (
     csv_to_hyper,
     infer_csv_schema,
 )
+from cwtwb.dashboard_enhancements import (
+    auto_add_actions,
+    select_auto_filters,
+    validate_suggestion,
+)
 from cwtwb.twb_editor import TWBEditor
 
 logger = logging.getLogger(__name__)
@@ -83,11 +88,17 @@ def build_dashboard_from_csv(
         logger.info("Generating chart suggestions")
         suggestion = suggest_charts(classified, max_charts=max_charts)
 
+    # Validate suggestion (remove invalid maps, dedup, enforce max)
+    suggestion = validate_suggestion(suggestion, classified, max_charts)
+
     if not suggestion.charts:
         raise ValueError(
             "No charts could be suggested for this data. "
             "Ensure the CSV has at least one numeric column."
         )
+
+    # Select auto-filters for interactivity
+    auto_filters = select_auto_filters(classified, max_filters=3)
 
     # Step 4: Create Hyper extract
     hyper_dir = tempfile.mkdtemp(prefix="cwtwb_pipeline_")
@@ -119,15 +130,16 @@ def build_dashboard_from_csv(
 
         # Build configure_chart kwargs from shelf assignments
         chart_kwargs = _build_chart_kwargs(chart)
+        if auto_filters:
+            chart_kwargs["filters"] = auto_filters
         try:
             editor.configure_chart(ws_name, **chart_kwargs)
         except Exception as exc:
+            # Keep the worksheet in the layout — an empty chart zone is better
+            # than a missing one. The worksheet already exists via add_worksheet().
             logger.warning(
-                "Failed to configure chart '%s': %s. Skipping.", ws_name, exc
+                "Failed to configure chart '%s': %s. Keeping worksheet anyway.", ws_name, exc
             )
-            # Remove failed worksheet
-            worksheet_names.pop()
-            continue
 
     if not worksheet_names:
         raise RuntimeError("All chart configurations failed. Cannot build dashboard.")
@@ -137,14 +149,22 @@ def build_dashboard_from_csv(
         dashboard_title = suggestion.title or f"{csv_path.stem} Dashboard"
 
     logger.info("Creating dashboard: %s", dashboard_title)
-    layout = _build_layout(suggestion, worksheet_names)
+    layout = _build_layout(suggestion, worksheet_names, title=dashboard_title, filters=auto_filters)
     editor.add_dashboard(
         dashboard_name=dashboard_title,
         worksheet_names=worksheet_names,
         layout=layout,
     )
 
-    # Step 8b: Apply theme
+    # Step 8b: Add cross-sheet filter/highlight actions
+    try:
+        action_results = auto_add_actions(editor, dashboard_title, worksheet_names, classified)
+        for msg in action_results:
+            logger.info("Action: %s", msg)
+    except Exception as exc:
+        logger.warning("Auto-actions failed: %s", exc)
+
+    # Step 8c: Apply theme
     if theme:
         from cwtwb.style_presets import apply_theme_to_editor
 
@@ -234,33 +254,79 @@ def _format_field_expression(shelf: ShelfAssignment) -> str:
     return shelf.field_name
 
 
+def _reorder_kpis_first(
+    suggestion: DashboardSuggestion,
+    worksheet_names: list[str],
+) -> list[str]:
+    """Reorder worksheet names so KPI (Text) charts come first.
+
+    This ensures templates place KPIs in the compact KPI row and
+    analytical charts in the spacious detail area.
+    """
+    if not suggestion.charts or len(suggestion.charts) != len(worksheet_names):
+        return worksheet_names
+
+    # Build a map from worksheet name to chart type
+    kpi_names = []
+    other_names = []
+    for ws_name, chart in zip(worksheet_names, suggestion.charts):
+        if chart.chart_type == "Text":
+            kpi_names.append(ws_name)
+        else:
+            other_names.append(ws_name)
+
+    return kpi_names + other_names
+
+
 def _build_layout(
     suggestion: DashboardSuggestion,
     worksheet_names: list[str],
+    title: str = "",
+    filters: list[dict] | None = None,
 ) -> str | dict:
     """Build a layout specification for the dashboard.
 
-    Uses the suggestion's template if available, otherwise falls back
-    to template selection based on chart mix, or simple layout strings.
-    """
-    from cwtwb.layout_templates import TEMPLATE_NAMES, get_template
+    Uses the C3 direct template (bypasses FlexNode for exact Tableau
+    layout matching) when KPIs are present. Falls back to named
+    templates or simple layout strings for other cases.
 
-    # Use explicitly set template from suggestion
-    template = suggestion.template
-    if template and template in TEMPLATE_NAMES:
-        return get_template(template, worksheet_names)
+    Args:
+        suggestion: Dashboard suggestion with chart list and optional template.
+        worksheet_names: List of worksheet names to place in the layout.
+        title: Optional dashboard title to prepend as a text zone.
+        filters: Optional list of auto-filter dicts for quick-filter zones.
+    """
+    # Reorder worksheet names so KPI (Text) charts come first.
+    ordered_names = _reorder_kpis_first(suggestion, worksheet_names)
 
     # Use layout_dict from image recognition if available
     if suggestion.layout_dict:
         return suggestion.layout_dict
 
-    # Auto-select template based on chart mix
-    has_kpi = any(c.chart_type == "Text" for c in suggestion.charts)
-    n = len(worksheet_names)
-
-    if has_kpi and n >= 3:
-        return get_template("executive-summary", worksheet_names)
-    elif n <= 3:
-        return get_template("overview", worksheet_names)
+    # Split into KPI and analytical chart names
+    kpi_names = []
+    chart_names_list = []
+    if suggestion.charts and len(suggestion.charts) == len(worksheet_names):
+        for ws_name, chart in zip(worksheet_names, suggestion.charts):
+            if chart.chart_type == "Text":
+                kpi_names.append(ws_name)
+            else:
+                chart_names_list.append(ws_name)
     else:
-        return get_template("grid", worksheet_names)
+        chart_names_list = list(ordered_names)
+
+    # Use C3 direct template for all dashboards (exact Tableau zone XML)
+    # Prefer the first chart worksheet for filter binding (more likely to
+    # have been configured successfully than the last one).
+    filter_ws = chart_names_list[0] if chart_names_list else (
+        kpi_names[0] if kpi_names else ""
+    )
+
+    return {
+        "_c3_template": True,
+        "_title": title,
+        "_kpi_names": kpi_names,
+        "_chart_names": chart_names_list,
+        "_filters": filters,
+        "_filter_worksheet": filter_ws,
+    }

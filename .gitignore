@@ -29,8 +29,18 @@ env/
 Thumbs.db
 desktop.ini
 
+# Node
+node_modules/
+package-lock.json
+
 # Test output
 output/
+
+# Temp files
+temp_template.twb
+test_api.py
+test_env.py
+example_data.csv
 
 # Large/binary project files
 backup/

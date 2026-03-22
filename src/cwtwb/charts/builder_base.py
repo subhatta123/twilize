@@ -448,7 +448,7 @@ class BaseChartBuilder:
     ) -> None:
         """Append supported filter XML nodes to the worksheet view."""
         for f in filters:
-            expr = f.get("column")
+            expr = f.get("column") or f.get("field")
             if not expr:
                 continue
             values = f.get("values", [])

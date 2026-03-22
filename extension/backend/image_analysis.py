@@ -206,11 +206,32 @@ def _analyze_with_anthropic(image_base64: str, api_key: str) -> dict:
                 }
             ],
         },
-        timeout=30.0,
+        timeout=60.0,
     )
     response.raise_for_status()
     text = response.json()["content"][0]["text"]
-    return json.loads(text)
+    return _extract_json(text)
+
+
+def _extract_json(text: str) -> dict:
+    """Extract JSON from LLM response, handling markdown fences."""
+    import re
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    match = re.search(r'```(?:json)?\s*\n?(.*?)\n?\s*```', text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(1).strip())
+        except json.JSONDecodeError:
+            pass
+    first = text.find('{')
+    last = text.rfind('}')
+    if first != -1 and last > first:
+        return json.loads(text[first:last + 1])
+    raise json.JSONDecodeError(f"No JSON found in response", text, 0)
 
 
 def _analyze_with_openai(image_base64: str, api_key: str) -> dict:
@@ -241,8 +262,8 @@ def _analyze_with_openai(image_base64: str, api_key: str) -> dict:
             ],
             "response_format": {"type": "json_object"},
         },
-        timeout=30.0,
+        timeout=60.0,
     )
     response.raise_for_status()
     text = response.json()["choices"][0]["message"]["content"]
-    return json.loads(text)
+    return _extract_json(text)

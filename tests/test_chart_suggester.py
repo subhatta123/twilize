@@ -8,6 +8,7 @@ from cwtwb.chart_suggester import (
     ChartSuggestion,
     DashboardSuggestion,
     format_suggestions,
+    smart_aggregation,
     suggest_charts,
 )
 from cwtwb.csv_to_hyper import classify_columns, infer_csv_schema
@@ -79,7 +80,9 @@ class TestChartSuggestion:
 
     def test_suggests_scatter_for_two_measures(self, full_csv):
         classified = _get_classified(full_csv)
-        result = suggest_charts(classified)
+        # Use higher limit since KPIs (95) + Lines (92) + Bars (85) fill
+        # up earlier slots with story-based scoring
+        result = suggest_charts(classified, max_charts=10)
         types = [c.chart_type for c in result.charts]
         assert "Scatterplot" in types
 
@@ -126,6 +129,61 @@ class TestChartSuggestion:
         classified = _get_classified(full_csv)
         result = suggest_charts(classified)
         assert result.layout in ("grid", "horizontal", "vertical")
+
+
+class TestSmartAggregation:
+    """Test semantic field classification for aggregation."""
+
+    def test_discount_gets_avg(self):
+        assert smart_aggregation("Discount") == "AVG"
+
+    def test_profit_margin_gets_avg(self):
+        assert smart_aggregation("Profit Margin") == "AVG"
+
+    def test_satisfaction_score_gets_avg(self):
+        assert smart_aggregation("Customer Satisfaction Score") == "AVG"
+
+    def test_conversion_rate_gets_avg(self):
+        assert smart_aggregation("Conversion Rate") == "AVG"
+
+    def test_sales_gets_sum(self):
+        assert smart_aggregation("Sales") == "SUM"
+
+    def test_profit_gets_sum(self):
+        assert smart_aggregation("Profit") == "SUM"
+
+    def test_revenue_gets_sum(self):
+        assert smart_aggregation("Revenue") == "SUM"
+
+    def test_quantity_gets_sum(self):
+        assert smart_aggregation("Quantity") == "SUM"
+
+    def test_order_id_gets_countd(self):
+        assert smart_aggregation("Order ID") == "COUNTD"
+
+    def test_customer_key_gets_countd(self):
+        assert smart_aggregation("Customer Key") == "COUNTD"
+
+    def test_unknown_defaults_to_sum(self):
+        assert smart_aggregation("Foo Bar Baz") == "SUM"
+
+    def test_case_insensitive(self):
+        assert smart_aggregation("DISCOUNT") == "AVG"
+        assert smart_aggregation("sales") == "SUM"
+
+    def test_kpi_title_reflects_aggregation(self, full_csv):
+        """KPI titles should say 'Average' for rates, 'Total' for amounts."""
+        classified = _get_classified(full_csv)
+        result = suggest_charts(classified)
+        kpi_charts = [c for c in result.charts if c.chart_type == "Text"]
+        for kpi in kpi_charts:
+            # KPI for a rate field should say "Average"
+            if any("discount" in s.field_name.lower() for s in kpi.shelves):
+                assert "Average" in kpi.title
+            # KPI for an amount field should say "Total"
+            elif any("sales" in s.field_name.lower() or "revenue" in s.field_name.lower()
+                     for s in kpi.shelves):
+                assert "Total" in kpi.title
 
 
 class TestFormatSuggestions:

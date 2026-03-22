@@ -36,9 +36,9 @@ def render_flex_node(
     elif node.type == "worksheet":
         if node.name:
             zone.set("name", node.name)
-        zone.set("show-title", "false")
+        zone.set("show-title", "true" if node.show_title else "false")
         
-        fit = getattr(node, "fit", None)
+        fit = getattr(node, "fit", None) or "entire"
         if fit:
             cache = etree.SubElement(zone, "layout-cache")
             if fit == "entire":
@@ -65,6 +65,19 @@ def render_flex_node(
         _render_empty(node, zone)
 
     style_dict = dict(node.style)
+    # Professional template pattern: no borders, use margin + background contrast
+    if node.type == "worksheet":
+        if "margin" not in style_dict:
+            style_dict["margin"] = "4"
+        if "border-style" not in style_dict:
+            style_dict["border-style"] = "none"
+            style_dict["border-width"] = "0"
+    # Inherit background-color from parent container onto worksheet zones
+    # so the tinted card effect is visible (Tableau sheets are opaque)
+    if node.type == "worksheet" and "background-color" not in style_dict:
+        parent_style = getattr(node, "_parent_bg", None)
+        if parent_style:
+            style_dict["background-color"] = parent_style
     if node.type in ("filter", "paramctrl"):
         if "background-color" not in style_dict and "background_color" not in style_dict:
             style_dict["background-color"] = "#ffffff"
@@ -139,7 +152,12 @@ def _render_container(
     zone.set("param", "horz" if node.direction == "horizontal" else "vert")
     if node.layout_strategy:
         zone.set("layout-strategy-id", node.layout_strategy)
+    # Propagate background-color from container to children so worksheet
+    # zones can inherit the tinted card background
+    parent_bg = node.style.get("background-color") or node.style.get("background_color")
     for child in node.children:
+        if parent_bg and child.type == "worksheet":
+            child._parent_bg = parent_bg
         render_flex_node(child, zone, get_id_fn, context)
 
 
