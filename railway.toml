@@ -1,5 +1,5 @@
 [build]
-buildCommand = "pip install -e '.[extension]'"
+buildCommand = "pip install '.[extension]'"
 
 [deploy]
-startCommand = "python -m uvicorn extension.backend.app:app --host 0.0.0.0 --port ${PORT:-8000}"
+startCommand = "PYTHONPATH=/app/src:/app python -m uvicorn extension.backend.app:app --host 0.0.0.0 --port ${PORT:-8000}"
