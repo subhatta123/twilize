@@ -1,0 +1,11 @@
+# Core dependencies
+lxml>=5.0
+mcp[cli]>=1.0
+xlrd>=2.0
+
+# Extension backend dependencies
+fastapi>=0.100
+uvicorn>=0.20
+httpx>=0.24
+tableauhyperapi>=0.0.21408
+python-multipart
