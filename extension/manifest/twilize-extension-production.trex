@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest manifest-version="0.1" xmlns="http://www.tableau.com/xml/extension_manifest">
+  <dashboard-extension id="com.twilize.dashboard-builder" extension-version="0.1.0">
+    <default-locale>en_US</default-locale>
+    <name resource-id="name">Twilize Dashboard Builder</name>
+    <description>Generate Tableau dashboards from connected data using AI-powered suggestions</description>
+    <author name="Suddhasheel Bhattacharya" email="suddhasheel.bhattacharya@gmail.com" organization="Twilize" website="https://github.com/subhatta123/twilize"/>
+    <min-api-version>1.7</min-api-version>
+    <source-location>
+      <url>https://twilize-production.up.railway.app</url>
+    </source-location>
+    <icon>iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR4nGPwq1xBEmIY1TCqYfhqAADB728Q87YUCwAAAABJRU5ErkJggg==</icon>
+    <permissions>
+      <permission>full data</permission>
+    </permissions>
+  </dashboard-extension>
+  <resources>
+    <resource id="name">
+      <text locale="en_US">Twilize Dashboard Builder</text>
+    </resource>
+  </resources>
+</manifest>
