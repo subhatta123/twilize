@@ -33,6 +33,9 @@ class ChartSuggestion:
     shelves: list[ShelfAssignment] = field(default_factory=list)
     reason: str = ""
     priority: int = 0  # higher = better fit
+    top_n: dict | None = field(default=None)  # {"field": ..., "n": 10, "by": "SUM(Sales)"}
+    sort_descending: str = ""  # e.g. "SUM(Sales)" — adds descending shelf sort
+    text_format: dict | None = field(default=None)  # {"AVG(Margin)": "0.00%"}
 
 
 @dataclass
@@ -72,6 +75,12 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
     for m in measures[:kpi_limit]:
         agg = smart_aggregation(m.spec.name)
         kpi_title = _kpi_title(agg, m.spec.name)
+        # Auto-format rate/percentage fields as "12.01%" instead of "0.1201"
+        kpi_text_fmt = None
+        if _is_rate_field(m.spec.name):
+            kpi_text_fmt = {f"{agg}({m.spec.name})": "0.00%"}
+        elif _is_currency_field(m.spec.name):
+            kpi_text_fmt = {f"{agg}({m.spec.name})": "$#,##0"}
         suggestions.append(ChartSuggestion(
             chart_type="Text",
             title=kpi_title,
@@ -80,17 +89,25 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
             ],
             reason="Key metric summary KPI",
             priority=95,
+            text_format=kpi_text_fmt,
         ))
 
     # --- Temporal + Measure → Line chart ---
     if temporal and measures:
         time_col = temporal[0]
+        # Use MONTH granularity for richer trends (>4 data points);
+        # fall back to YEAR only when cardinality is very low.
+        time_card = time_col.spec.cardinality
+        if time_card <= 5:
+            time_expr = f"MONTH({time_col.spec.name})"
+        else:
+            time_expr = time_col.spec.name
         for m in measures[:2]:
             suggestions.append(ChartSuggestion(
                 chart_type="Line",
-                title=f"How has {m.spec.name} trended over time?",
+                title=f"{m.spec.name} Trend Over Time",
                 shelves=[
-                    ShelfAssignment(time_col.spec.name, "columns"),
+                    ShelfAssignment(time_expr, "columns"),
                     ShelfAssignment(m.spec.name, "rows", smart_aggregation(m.spec.name)),
                 ],
                 reason="Temporal dimension with numeric measure → line chart",
@@ -103,13 +120,18 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
                 and d.spec.cardinality <= 12]
     if temporal and measures and cat_dims:
         time_col = temporal[0]
+        time_card = time_col.spec.cardinality
+        if time_card <= 5:
+            time_expr_color = f"MONTH({time_col.spec.name})"
+        else:
+            time_expr_color = time_col.spec.name
         color_dim = cat_dims[0]
         m = measures[0]
         suggestions.append(ChartSuggestion(
             chart_type="Line",
-            title=f"How does {m.spec.name} differ by {color_dim.spec.name} over time?",
+            title=f"{m.spec.name} by {color_dim.spec.name} Over Time",
             shelves=[
-                ShelfAssignment(time_col.spec.name, "columns"),
+                ShelfAssignment(time_expr_color, "columns"),
                 ShelfAssignment(m.spec.name, "rows", smart_aggregation(m.spec.name)),
                 ShelfAssignment(color_dim.spec.name, "color"),
             ],
@@ -118,19 +140,28 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
         ))
 
     # --- Categorical dim + Measure → Bar chart ---
+    # When the dimension has >10 distinct values, auto-apply a Top 10
+    # filter so the chart stays readable (fixes visual clutter).
     if cat_dims and measures:
         dim = _best_categorical_dim(cat_dims)
         m = measures[0]
-        suggestions.append(ChartSuggestion(
+        agg = smart_aggregation(m.spec.name)
+        bar_title = f"Top 10 {dim.spec.name} by {m.spec.name}" if dim.spec.cardinality > 10 else f"{m.spec.name} by {dim.spec.name}"
+        bar_chart = ChartSuggestion(
             chart_type="Bar",
-            title=f"Which {dim.spec.name} has the highest {m.spec.name}?",
+            title=bar_title,
             shelves=[
                 ShelfAssignment(dim.spec.name, "rows"),
-                ShelfAssignment(m.spec.name, "columns", smart_aggregation(m.spec.name)),
+                ShelfAssignment(m.spec.name, "columns", agg),
             ],
             reason="Categorical dimension with numeric measure → horizontal bar chart",
             priority=80,
-        ))
+        )
+        # Attach top-N and sort metadata for pipeline to pick up
+        if dim.spec.cardinality > 10:
+            bar_chart.top_n = {"field": dim.spec.name, "n": 10, "by": f"{agg}({m.spec.name})"}
+        bar_chart.sort_descending = f"{agg}({m.spec.name})"
+        suggestions.append(bar_chart)
 
     # --- Two measures → Scatter plot ---
     if len(measures) >= 2:
@@ -410,6 +441,20 @@ def smart_aggregation(field_name: str) -> str:
 
 # Keep backward-compatible alias
 _default_aggregation = smart_aggregation
+
+
+def _is_rate_field(field_name: str) -> bool:
+    """Return True if the field represents a rate/percentage/ratio."""
+    lower = field_name.lower()
+    return any(kw in lower for kw in _RATE_KEYWORDS)
+
+
+def _is_currency_field(field_name: str) -> bool:
+    """Return True if the field represents a monetary amount."""
+    lower = field_name.lower()
+    _CURRENCY_KW = {"sales", "revenue", "cost", "price", "amount", "profit",
+                    "income", "expense", "fee", "tax", "payment", "budget", "spend"}
+    return any(kw in lower for kw in _CURRENCY_KW)
 
 
 def _kpi_title(aggregation: str, field_name: str) -> str:

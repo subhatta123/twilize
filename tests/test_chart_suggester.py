@@ -74,7 +74,9 @@ class TestChartSuggestion:
 
     def test_suggests_bar_for_categorical(self, full_csv):
         classified = _get_classified(full_csv)
-        result = suggest_charts(classified)
+        # Use higher limit since KPIs (95) + Lines (92) may fill the
+        # default 5 slots before Bar charts
+        result = suggest_charts(classified, max_charts=10)
         types = [c.chart_type for c in result.charts]
         assert "Bar" in types
 

@@ -132,6 +132,22 @@ def build_dashboard_from_csv(
         chart_kwargs = _build_chart_kwargs(chart)
         if auto_filters:
             chart_kwargs["filters"] = auto_filters
+        # Pass through Top N filter, sort, and text_format from suggestion
+        if chart.top_n:
+            top = chart.top_n
+            top_filter = {
+                "type": "categorical",
+                "field": top["field"],
+                "top": top["n"],
+                "by": top["by"],
+                "direction": "DESC",
+            }
+            chart_kwargs.setdefault("filters", [])
+            chart_kwargs["filters"] = list(chart_kwargs["filters"]) + [top_filter]
+        if chart.sort_descending:
+            chart_kwargs["sort_descending"] = chart.sort_descending
+        if chart.text_format:
+            chart_kwargs["text_format"] = chart.text_format
         try:
             editor.configure_chart(ws_name, **chart_kwargs)
         except Exception as exc:

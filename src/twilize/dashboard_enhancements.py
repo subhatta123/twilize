@@ -46,6 +46,10 @@ def select_auto_filters(
     * Rank by cardinality "sweetness" (prefer 4–12).
     """
     candidates: list[tuple[int, dict]] = []
+    # Collect temporal fields separately — we only keep the best one
+    # to avoid confusing overlapping date filters (e.g. Order Date AND
+    # Ship Date together create contradictory UX).
+    temporal_candidates: list[tuple[int, dict]] = []
 
     for col in classified.dimensions:
         # Skip geographic fields
@@ -55,8 +59,16 @@ def select_auto_filters(
         card = col.spec.cardinality
 
         if col.semantic_type == "temporal":
-            # Temporal fields are always useful filters
-            candidates.append((80, {
+            # Prefer "order" dates over "ship"/"delivery" dates; generic
+            # date fields get a middle score.
+            lower_name = col.spec.name.lower()
+            if "order" in lower_name or "purchase" in lower_name:
+                score = 90
+            elif "ship" in lower_name or "deliver" in lower_name:
+                score = 50
+            else:
+                score = 80
+            temporal_candidates.append((score, {
                 "type": "categorical",
                 "field": col.spec.name,
                 "values": [],
@@ -79,6 +91,11 @@ def select_auto_filters(
                 "field": col.spec.name,
                 "values": [],
             }))
+
+    # Add only the best temporal field (avoid contradictory date filters)
+    if temporal_candidates:
+        temporal_candidates.sort(key=lambda x: x[0], reverse=True)
+        candidates.append(temporal_candidates[0])
 
     # Sort by score descending
     candidates.sort(key=lambda x: x[0], reverse=True)
