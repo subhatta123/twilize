@@ -51,6 +51,22 @@ def select_auto_filters(
     # Ship Date together create contradictory UX).
     temporal_candidates: list[tuple[int, dict]] = []
 
+    import re as _re
+
+    def _is_temporal_field(col) -> bool:
+        """Detect temporal fields — both native date types and YEAR()/MONTH() wrappers.
+
+        When data arrives from Tableau Extensions API, fields like YEAR(Order Date)
+        come as integers, not dates.  We still need to group them as temporal.
+        """
+        if col.semantic_type == "temporal":
+            return True
+        # Detect YEAR(...), MONTH(...), QUARTER(...) wrapper patterns
+        name = col.spec.name
+        if _re.match(r'^(YEAR|MONTH|QUARTER|DAY|WEEK)\(', name, _re.IGNORECASE):
+            return True
+        return False
+
     for col in classified.dimensions:
         # Skip geographic fields
         if col.semantic_type == "geographic":
@@ -58,7 +74,7 @@ def select_auto_filters(
 
         card = col.spec.cardinality
 
-        if col.semantic_type == "temporal":
+        if _is_temporal_field(col):
             # Prefer "order" dates over "ship"/"delivery" dates; generic
             # date fields get a middle score.
             lower_name = col.spec.name.lower()

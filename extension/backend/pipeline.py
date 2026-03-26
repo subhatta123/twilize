@@ -201,6 +201,53 @@ def generate_workbook(
 
         chart_kwargs = _build_chart_kwargs(chart)
 
+        # Pass through top_n, sort_descending, and text_format from suggestion
+        # (same as the MCP pipeline does)
+        if chart.top_n:
+            top = chart.top_n
+            top_filter = {
+                "type": "categorical",
+                "field": top["field"],
+                "top": top["n"],
+                "by": top["by"],
+                "direction": "DESC",
+            }
+            chart_kwargs.setdefault("filters", [])
+            chart_kwargs["filters"] = list(chart_kwargs["filters"]) + [top_filter]
+        if chart.sort_descending:
+            chart_kwargs["sort_descending"] = chart.sort_descending
+        if chart.text_format:
+            chart_kwargs["text_format"] = chart.text_format
+
+        # Issue 4 fix: Force MONTH granularity for line chart temporal columns.
+        # Bare date fields default to YEAR in Tableau (only 4 data points).
+        if chart.chart_type == "Line":
+            temporal_names = {c.spec.name for c in classified.temporal}
+            for key in ("columns", "rows"):
+                if key in chart_kwargs:
+                    val = chart_kwargs[key]
+                    if isinstance(val, list):
+                        chart_kwargs[key] = [
+                            f"MONTH({v})" if v in temporal_names else v
+                            for v in val
+                        ]
+                    elif isinstance(val, str) and val in temporal_names:
+                        chart_kwargs[key] = f"MONTH({val})"
+
+        # Issue 2/6 fix: Auto-detect rate/ratio KPIs and format as percentage
+        if chart.chart_type == "Text" and not chart.text_format:
+            label_field = chart_kwargs.get("label", "")
+            if label_field:
+                lower = label_field.lower()
+                # Check for fields containing common rate/ratio patterns
+                rate_keywords = ("margin", "rate", "ratio", "percent", "pct", "share")
+                if any(kw in lower for kw in rate_keywords):
+                    # Wrap in AVG if not already aggregated
+                    bare = label_field
+                    if "(" in bare and ")" in bare:
+                        bare = bare.split("(", 1)[1].rsplit(")", 1)[0]
+                    chart_kwargs["text_format"] = {label_field: "0.00%"}
+
         # Map chart type: ensure geo field is on "detail" and measure on "color"
         if chart.chart_type == "Map":
             # Find geo dimension and measure among shelves
