@@ -91,8 +91,13 @@ class BaseChartBuilder:
                 all_exprs.extend(tooltip)
         if filters:
             for f in filters:
-                if "column" in f:
-                    all_exprs.append(f["column"])
+                # Support both "column" and "field" keys (Top N uses "field")
+                filter_expr = f.get("column") or f.get("field")
+                if filter_expr:
+                    all_exprs.append(filter_expr)
+                # Top N filters also need the ranking measure in instances
+                if "by" in f and f["by"]:
+                    all_exprs.append(f["by"])
         if geographic_field:
             all_exprs.append(geographic_field)
         if measure_values:
