@@ -33,6 +33,7 @@ class TextChartBuilder(BaseChartBuilder):
         measure_values: Optional[list[str]] = None,
         label_runs: Optional[list[dict]] = None,
         label_param: Optional[str] = None,
+        text_format: Optional[dict[str, str]] = None,
     ) -> None:
         """Capture text-table/KPI options, including measure-values configuration."""
         super().__init__(editor)
@@ -50,6 +51,7 @@ class TextChartBuilder(BaseChartBuilder):
         self.measure_values = measure_values or []
         self.label_runs = label_runs or []
         self.label_param = label_param
+        self.text_format = text_format or {}
 
     def build(self) -> str:
         """Build text mark worksheet XML and optional measure-values overlays."""
@@ -159,5 +161,20 @@ class TextChartBuilder(BaseChartBuilder):
 
         if self.filters:
             self._add_filters(view, instances, self.filters)
+
+        # Apply text formatting (e.g. percentage, currency) to KPI values
+        if self.text_format:
+            from .builder_basic import _get_or_create_table_style
+            table_style = _get_or_create_table_style(table)
+            cell_rule = etree.SubElement(table_style, "style-rule")
+            cell_rule.set("element", "cell")
+            for field_expr, fmt_str in self.text_format.items():
+                ci = instances.get(field_expr)
+                if ci:
+                    full_ref = self.field_registry.resolve_full_reference(ci.instance_name)
+                    fmt = etree.SubElement(cell_rule, "format")
+                    fmt.set("attr", "text-format")
+                    fmt.set("field", full_ref)
+                    fmt.set("value", fmt_str)
 
         return f"Configured worksheet '{self.worksheet_name}' as Text chart"

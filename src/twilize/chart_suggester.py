@@ -95,13 +95,10 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
     # --- Temporal + Measure → Line chart ---
     if temporal and measures:
         time_col = temporal[0]
-        # Use MONTH granularity for richer trends (>4 data points);
-        # fall back to YEAR only when cardinality is very low.
-        time_card = time_col.spec.cardinality
-        if time_card <= 5:
-            time_expr = f"MONTH({time_col.spec.name})"
-        else:
-            time_expr = time_col.spec.name
+        # Always use MONTH granularity for line trends — bare date fields
+        # default to YEAR in Tableau which typically produces too few data
+        # points (e.g. 4 dots for 4 years).  MONTH gives ~48 points.
+        time_expr = f"MONTH({time_col.spec.name})"
         for m in measures[:2]:
             suggestions.append(ChartSuggestion(
                 chart_type="Line",
@@ -120,11 +117,7 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
                 and d.spec.cardinality <= 12]
     if temporal and measures and cat_dims:
         time_col = temporal[0]
-        time_card = time_col.spec.cardinality
-        if time_card <= 5:
-            time_expr_color = f"MONTH({time_col.spec.name})"
-        else:
-            time_expr_color = time_col.spec.name
+        time_expr_color = f"MONTH({time_col.spec.name})"
         color_dim = cat_dims[0]
         m = measures[0]
         suggestions.append(ChartSuggestion(

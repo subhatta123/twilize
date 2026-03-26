@@ -115,6 +115,7 @@ def configure_chart(
             measure_values,
             label_runs=label_runs,
             label_param=label_param,
+            text_format=text_format,
         )
         return builder.build()
 
