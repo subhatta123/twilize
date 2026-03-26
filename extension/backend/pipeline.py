@@ -163,6 +163,16 @@ def generate_workbook(
     # Validate suggestion (remove invalid maps, dedup, enforce max)
     suggestion = validate_suggestion(suggestion, classified, max_charts=8)
 
+    # Build field lookups needed by post-processing and chart configuration
+    known_fields = {f.name for f in fields}
+    _numeric_fields = {f.name for f in fields if f.datatype in ("int", "float", "real")}
+    temporal_map: dict[str, str] = {}
+    for fn in known_fields:
+        if fn.startswith("YEAR(") and fn.endswith(")"):
+            bare = fn[5:-1]
+            if bare not in known_fields:
+                temporal_map[bare] = fn
+
     # ── Post-process: ensure Top N, sort, and number formatting on all charts ──
     # This catches ALL code paths (LLM, prompt-guided, image-guided, rule-based,
     # diversity swaps, fallbacks) regardless of where the chart was created.
@@ -214,18 +224,6 @@ def generate_workbook(
                     auto_fmt[shelf.field_name] = '#,##0.0,,,"B"'
             if auto_fmt:
                 chart.text_format = auto_fmt
-
-    # Build a field name mapping: bare name -> YEAR(name) for temporal fields
-    # so that LLM/rule-based references like "Order Date" resolve to "YEAR(Order Date)"
-    known_fields = {f.name for f in fields}
-    # Also track which fields are actually numeric (for aggregation validation)
-    _numeric_fields = {f.name for f in fields if f.datatype in ("int", "float", "real")}
-    temporal_map: dict[str, str] = {}
-    for fn in known_fields:
-        if fn.startswith("YEAR(") and fn.endswith(")"):
-            bare = fn[5:-1]  # "YEAR(Order Date)" -> "Order Date"
-            if bare not in known_fields:
-                temporal_map[bare] = fn
 
     # Select auto-filters for interactivity
     auto_filters = select_auto_filters(classified, max_filters=5)
