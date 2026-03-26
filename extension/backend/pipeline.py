@@ -120,7 +120,29 @@ def generate_workbook(
     for conn_el in editor._datasource.findall(".//connection[@class='hyper']"):
         conn_el.set("dbname", hyper_archive_path)
 
-    # Step 5b: Create calculated fields if the plan includes them
+    # Step 5b: Auto-format measure columns to avoid locale issues
+    # (e.g. Indian numbering "1,06,10,00,00,000" → international "1.06T")
+    # and prevent KPI overflow ("############")
+    from twilize.chart_suggester import _is_rate_field, _is_currency_field, _is_population_field
+    for col_el in editor._datasource.findall(".//column"):
+        col_name = col_el.get("caption") or col_el.get("name", "")
+        # Strip brackets for matching
+        bare_name = col_name.strip("[]")
+        if col_el.get("role") != "measure":
+            continue
+        if col_el.get("default-format"):
+            continue  # already formatted
+        if _is_rate_field(bare_name):
+            col_el.set("default-format", "0.00%")
+        elif _is_currency_field(bare_name):
+            col_el.set("default-format", '$#,##0.0,,,"B"')
+        elif _is_population_field(bare_name):
+            col_el.set("default-format", '#,##0.0,,,"B"')
+        elif col_el.get("datatype") in ("real", "integer"):
+            # Generic large-number formatting — forces international locale
+            col_el.set("default-format", "#,##0")
+
+    # Step 5c: Create calculated fields if the plan includes them
     calc_fields = plan.get("calculated_fields", [])
     for cf in calc_fields:
         cf_name = cf.get("name", "")
@@ -140,6 +162,48 @@ def generate_workbook(
 
     # Validate suggestion (remove invalid maps, dedup, enforce max)
     suggestion = validate_suggestion(suggestion, classified, max_charts=8)
+
+    # ── Post-process: ensure Top N, sort, and number formatting on all charts ──
+    # This catches ALL code paths (LLM, prompt-guided, image-guided, rule-based,
+    # diversity swaps, fallbacks) regardless of where the chart was created.
+    _dim_cardinality = {d.spec.name: d.spec.cardinality for d in classified.dimensions}
+    from twilize.chart_suggester import _is_rate_field, _is_currency_field, _is_population_field, smart_aggregation
+    for chart in suggestion.charts:
+        # Auto-apply Top N to Bar charts with high-cardinality dimensions
+        if chart.chart_type == "Bar" and not chart.top_n:
+            for shelf in chart.shelves:
+                if shelf.shelf in ("rows", "columns") and not shelf.aggregation:
+                    card = _dim_cardinality.get(shelf.field_name, 0)
+                    if card > 10:
+                        # Find the measure to rank by
+                        measure_shelf = next(
+                            (s for s in chart.shelves if s.aggregation), None
+                        )
+                        if measure_shelf:
+                            chart.top_n = {
+                                "field": shelf.field_name,
+                                "n": 10,
+                                "by": f"{measure_shelf.aggregation}({measure_shelf.field_name})",
+                            }
+                            chart.sort_descending = chart.sort_descending or measure_shelf.field_name
+                            print(f"[PIPELINE] Auto-applied Top 10 on '{shelf.field_name}' by '{chart.top_n['by']}'")
+                        break
+
+        # Auto-apply number formatting to KPI text charts
+        if chart.chart_type == "Text" and not chart.text_format:
+            auto_fmt: dict[str, str] = {}
+            for shelf in chart.shelves:
+                bare = shelf.field_name
+                if "(" in bare and ")" in bare:
+                    bare = bare.split("(", 1)[1].rsplit(")", 1)[0]
+                if _is_rate_field(bare):
+                    auto_fmt[shelf.field_name] = "0.00%"
+                elif _is_currency_field(bare):
+                    auto_fmt[shelf.field_name] = '$#,##0.0,,,"B"'
+                elif _is_population_field(bare):
+                    auto_fmt[shelf.field_name] = '#,##0.0,,,"B"'
+            if auto_fmt:
+                chart.text_format = auto_fmt
 
     # Select auto-filters for interactivity
     auto_filters = select_auto_filters(classified, max_filters=5)
@@ -347,6 +411,20 @@ def generate_workbook(
                     shelf.field_name = temporal_map[shelf.field_name]
 
             alt_kwargs = _build_chart_kwargs(alt)
+            # Apply Top N from fallback chart if present
+            if alt.top_n:
+                top = alt.top_n
+                top_filter = {
+                    "type": "categorical",
+                    "field": top["field"],
+                    "top": top["n"],
+                    "by": top["by"],
+                    "direction": "DESC",
+                }
+                alt_kwargs.setdefault("filters", [])
+                alt_kwargs["filters"] = list(alt_kwargs["filters"]) + [top_filter]
+            if alt.sort_descending:
+                alt_kwargs["sort_descending"] = alt.sort_descending
             for shelf_key in ("rows", "columns", "color", "size", "label", "detail"):
                 if shelf_key in alt_kwargs:
                     val = alt_kwargs[shelf_key]
@@ -355,7 +433,8 @@ def generate_workbook(
                     elif isinstance(val, str):
                         alt_kwargs[shelf_key] = _resolve_field(val)
             if auto_filters:
-                alt_kwargs["filters"] = auto_filters
+                existing = alt_kwargs.get("filters") or []
+                alt_kwargs["filters"] = list(existing) + list(auto_filters)
             try:
                 editor.configure_chart(ws_name, **alt_kwargs)
                 configured_ok.add(ws_name)
