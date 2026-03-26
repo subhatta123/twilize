@@ -189,6 +189,16 @@ def generate_workbook(
                             print(f"[PIPELINE] Auto-applied Top 10 on '{shelf.field_name}' by '{chart.top_n['by']}'")
                         break
 
+        # Validate aggregations: prevent AVG/SUM on non-numeric fields
+        for shelf in chart.shelves:
+            if shelf.aggregation and shelf.aggregation.upper() in ("SUM", "AVG", "MEDIAN"):
+                bare_field = shelf.field_name
+                if "(" in bare_field and ")" in bare_field:
+                    bare_field = bare_field.split("(", 1)[1].rsplit(")", 1)[0]
+                if bare_field not in _numeric_fields and bare_field not in temporal_map:
+                    print(f"[PIPELINE] WARNING: {shelf.aggregation}({bare_field}) on non-numeric field, switching to COUNT")
+                    shelf.aggregation = "COUNT"
+
         # Auto-apply number formatting to KPI text charts
         if chart.chart_type == "Text" and not chart.text_format:
             auto_fmt: dict[str, str] = {}
@@ -205,18 +215,33 @@ def generate_workbook(
             if auto_fmt:
                 chart.text_format = auto_fmt
 
-    # Select auto-filters for interactivity
-    auto_filters = select_auto_filters(classified, max_filters=5)
-
     # Build a field name mapping: bare name -> YEAR(name) for temporal fields
     # so that LLM/rule-based references like "Order Date" resolve to "YEAR(Order Date)"
     known_fields = {f.name for f in fields}
+    # Also track which fields are actually numeric (for aggregation validation)
+    _numeric_fields = {f.name for f in fields if f.datatype in ("int", "float", "real")}
     temporal_map: dict[str, str] = {}
     for fn in known_fields:
         if fn.startswith("YEAR(") and fn.endswith(")"):
             bare = fn[5:-1]  # "YEAR(Order Date)" -> "Order Date"
             if bare not in known_fields:
                 temporal_map[bare] = fn
+
+    # Select auto-filters for interactivity
+    auto_filters = select_auto_filters(classified, max_filters=5)
+    # Resolve filter field names to actual datasource fields (e.g. "Year" -> "YEAR(Year)")
+    # and remove filters whose fields can't be resolved to a known field
+    _resolved_filters: list[dict] = []
+    for af in auto_filters:
+        field_name = af.get("field", "")
+        if field_name in known_fields:
+            _resolved_filters.append(af)
+        elif field_name in temporal_map:
+            af["field"] = temporal_map[field_name]
+            _resolved_filters.append(af)
+        else:
+            print(f"[PIPELINE] Skipping unresolvable filter: '{field_name}'")
+    auto_filters = _resolved_filters
 
     def _resolve_field(expr: str) -> str:
         """Resolve a field expression to its actual name in the registry.

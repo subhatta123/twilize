@@ -59,6 +59,30 @@ _GEO_KEYWORDS = {
 }
 
 
+def _values_look_numeric(sample_values: list[str], threshold: float = 0.5) -> bool:
+    """Check if sample values are actually numeric despite string type.
+
+    Returns True if at least *threshold* fraction of non-empty values
+    can be parsed as a number.  This prevents classifying genuinely
+    textual fields (e.g. "Business Tax Rate" with values like "N/A")
+    as numeric measures.
+    """
+    if not sample_values:
+        return False
+    non_empty = [v for v in sample_values if v and str(v).strip()]
+    if not non_empty:
+        return False
+    numeric_count = 0
+    for v in non_empty:
+        s = str(v).strip().replace(",", "").replace("%", "").replace("$", "")
+        try:
+            float(s)
+            numeric_count += 1
+        except (ValueError, TypeError):
+            pass
+    return (numeric_count / len(non_empty)) >= threshold
+
+
 @dataclass
 class ColumnSpec:
     """Schema specification for a single CSV column."""
@@ -264,7 +288,12 @@ def classify_columns(schema: CsvSchema) -> ClassifiedSchema:
             semantic_type = "categorical"
             role = "dimension"
         else:  # string
-            if name_words & _MEASURE_KEYWORDS:
+            # String columns should NOT be classified as numeric measures
+            # even if their name matches measure keywords (e.g. "Business
+            # Tax Rate" stored as string).  AVG/SUM on strings causes
+            # Tableau errors. Only promote to measure if sample values
+            # actually look numeric (e.g. "3.14", "1000", "-5.2").
+            if name_words & _MEASURE_KEYWORDS and _values_look_numeric(col.sample_values):
                 semantic_type = "numeric"
                 role = "measure"
             else:
