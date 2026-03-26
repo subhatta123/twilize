@@ -1210,26 +1210,35 @@ def _derive_title_from_prompt(prompt: str) -> str:
 
 def _suggestion_to_dict(suggestion: DashboardSuggestion) -> dict:
     """Convert a DashboardSuggestion to a JSON-serializable dict."""
+    charts_list = []
+    for c in suggestion.charts:
+        chart_dict: dict = {
+            "chart_type": c.chart_type,
+            "title": c.title,
+            "shelves": [
+                {
+                    "field_name": s.field_name,
+                    "shelf": s.shelf,
+                    "aggregation": s.aggregation,
+                }
+                for s in c.shelves
+            ],
+            "reason": c.reason,
+            "priority": c.priority,
+        }
+        # Preserve fields that affect chart quality (Top N, sorting, formatting)
+        if c.top_n:
+            chart_dict["top_n"] = c.top_n
+        if c.sort_descending:
+            chart_dict["sort_descending"] = c.sort_descending
+        if c.text_format:
+            chart_dict["text_format"] = c.text_format
+        charts_list.append(chart_dict)
+
     result: dict = {
         "title": suggestion.title,
         "layout": suggestion.layout,
-        "charts": [
-            {
-                "chart_type": c.chart_type,
-                "title": c.title,
-                "shelves": [
-                    {
-                        "field_name": s.field_name,
-                        "shelf": s.shelf,
-                        "aggregation": s.aggregation,
-                    }
-                    for s in c.shelves
-                ],
-                "reason": c.reason,
-                "priority": c.priority,
-            }
-            for c in suggestion.charts
-        ],
+        "charts": charts_list,
     }
     if suggestion.template:
         result["template"] = suggestion.template
@@ -1256,6 +1265,9 @@ def dict_to_suggestion(plan: dict) -> DashboardSuggestion:
             shelves=shelves,
             reason=c.get("reason", ""),
             priority=c.get("priority", 0),
+            top_n=c.get("top_n"),
+            sort_descending=c.get("sort_descending"),
+            text_format=c.get("text_format"),
         ))
 
     return DashboardSuggestion(
