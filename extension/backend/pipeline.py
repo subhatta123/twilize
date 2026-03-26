@@ -234,19 +234,40 @@ def generate_workbook(
                     elif isinstance(val, str) and val in temporal_names:
                         chart_kwargs[key] = f"MONTH({val})"
 
-        # Issue 2/6 fix: Auto-detect rate/ratio KPIs and format as percentage
-        if chart.chart_type == "Text" and not chart.text_format:
-            label_field = chart_kwargs.get("label", "")
-            if label_field:
-                lower = label_field.lower()
-                # Check for fields containing common rate/ratio patterns
-                rate_keywords = ("margin", "rate", "ratio", "percent", "pct", "share")
-                if any(kw in lower for kw in rate_keywords):
-                    # Wrap in AVG if not already aggregated
-                    bare = label_field
-                    if "(" in bare and ")" in bare:
-                        bare = bare.split("(", 1)[1].rsplit(")", 1)[0]
-                    chart_kwargs["text_format"] = {label_field: "0.00%"}
+        # Issue 2/6 fix: Auto-format numbers for readability.
+        # Applies to KPI text charts AND axis measures on bar/scatter/line charts.
+        # Uses the same heuristics as chart_suggester._smart_number_format.
+        from twilize.chart_suggester import _is_rate_field, _is_currency_field, _is_population_field
+        if not chart.text_format:
+            auto_fmt: dict[str, str] = {}
+            # Determine which field to format
+            if chart.chart_type == "Text":
+                # KPI: format the label field
+                _target_fields = [chart_kwargs.get("label", "")]
+            else:
+                # Charts: format measure fields on axes
+                _target_fields = []
+                for key in ("columns", "rows"):
+                    val = chart_kwargs.get(key, [])
+                    if isinstance(val, list):
+                        _target_fields.extend(val)
+                    elif isinstance(val, str):
+                        _target_fields.append(val)
+            for field_expr in _target_fields:
+                if not field_expr:
+                    continue
+                # Extract bare field name from aggregation wrapper
+                bare = field_expr
+                if "(" in bare and ")" in bare:
+                    bare = bare.split("(", 1)[1].rsplit(")", 1)[0]
+                if _is_rate_field(bare):
+                    auto_fmt[field_expr] = "0.00%"
+                elif _is_currency_field(bare):
+                    auto_fmt[field_expr] = '$#,##0.0,,,"B"'
+                elif _is_population_field(bare):
+                    auto_fmt[field_expr] = '#,##0.0,,,"B"'
+            if auto_fmt:
+                chart_kwargs["text_format"] = auto_fmt
 
         # Map chart type: ensure geo field is on "detail" and measure on "color"
         if chart.chart_type == "Map":

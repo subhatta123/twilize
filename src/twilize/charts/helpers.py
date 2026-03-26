@@ -87,6 +87,20 @@ def setup_table_style(table: etree._Element, mark_type: str) -> None:
 
     table_style = _get_or_create_table_style(table)
 
+    # Suppress null indicator badges (e.g. "10 nulls", "22 nulls")
+    # that clutter the chart when data has missing values.
+    # Tableau respects <semantic-values> with "null" entry to hide them.
+    sem_vals = table.find("semantic-values")
+    if sem_vals is None:
+        sem_vals = etree.SubElement(table, "semantic-values")
+    # Ensure null semantic value exists: key="[Measures].[avg:...]" not needed,
+    # a global key hides the null indicator for all measures
+    null_sv = sem_vals.find("semantic-value[@key='[value].[null]']")
+    if null_sv is None:
+        null_sv = etree.SubElement(sem_vals, "semantic-value")
+        null_sv.set("key", "[value].[null]")
+        null_sv.set("value", "&quot;Null&quot;")
+
     if mark_type == "Text":
         # BAN (Big Ass Number) styling for KPI text charts
         cell_rule = etree.SubElement(table_style, "style-rule")

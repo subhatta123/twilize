@@ -75,12 +75,12 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
     for m in measures[:kpi_limit]:
         agg = smart_aggregation(m.spec.name)
         kpi_title = _kpi_title(agg, m.spec.name)
-        # Auto-format rate/percentage fields as "12.01%" instead of "0.1201"
-        kpi_text_fmt = None
-        if _is_rate_field(m.spec.name):
-            kpi_text_fmt = {f"{agg}({m.spec.name})": "0.00%"}
-        elif _is_currency_field(m.spec.name):
-            kpi_text_fmt = {f"{agg}({m.spec.name})": "$#,##0"}
+        # Auto-format numbers for readability:
+        #   - Rates/percentages → "12.01%" (not 0.1201)
+        #   - Currency → "$173.0B" (not 173,000,000,000 or ############)
+        #   - Population → "8.5B" (not 85,05,91,27,313)
+        fmt_str = _smart_number_format(m.spec.name, agg)
+        kpi_text_fmt = {f"{agg}({m.spec.name})": fmt_str}
         suggestions.append(ChartSuggestion(
             chart_type="Text",
             title=kpi_title,
@@ -140,6 +140,9 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
         m = measures[0]
         agg = smart_aggregation(m.spec.name)
         bar_title = f"Top 10 {dim.spec.name} by {m.spec.name}" if dim.spec.cardinality > 10 else f"{m.spec.name} by {dim.spec.name}"
+        bar_text_fmt = None
+        if _is_rate_field(m.spec.name):
+            bar_text_fmt = {f"{agg}({m.spec.name})": "0.00%"}
         bar_chart = ChartSuggestion(
             chart_type="Bar",
             title=bar_title,
@@ -149,6 +152,7 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
             ],
             reason="Categorical dimension with numeric measure → horizontal bar chart",
             priority=80,
+            text_format=bar_text_fmt,
         )
         # Attach top-N and sort metadata for pipeline to pick up
         if dim.spec.cardinality > 10:
@@ -159,18 +163,38 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
     # --- Two measures → Scatter plot ---
     if len(measures) >= 2:
         m1, m2 = measures[0], measures[1]
+        agg1 = smart_aggregation(m1.spec.name)
+        agg2 = smart_aggregation(m2.spec.name)
         shelves = [
-            ShelfAssignment(m1.spec.name, "columns", smart_aggregation(m1.spec.name)),
-            ShelfAssignment(m2.spec.name, "rows", smart_aggregation(m2.spec.name)),
+            ShelfAssignment(m1.spec.name, "columns", agg1),
+            ShelfAssignment(m2.spec.name, "rows", agg2),
         ]
+        # Add detail dimension for scatter granularity + color for grouping
+        # Use a moderate-cardinality dimension to avoid overplotting
+        scatter_detail_dim = None
         if cat_dims:
-            shelves.append(ShelfAssignment(cat_dims[0].spec.name, "color"))
+            # Pick best dimension for detail (labelling individual points)
+            all_non_geo = [d for d in dims if d.semantic_type == "categorical"
+                           and d not in temporal and d not in geographic]
+            # For color, prefer low cardinality; for detail prefer higher
+            if all_non_geo:
+                scatter_detail_dim = max(all_non_geo, key=lambda d: d.spec.cardinality)
+                shelves.append(ShelfAssignment(scatter_detail_dim.spec.name, "detail"))
+            if cat_dims[0].spec.cardinality <= 12:
+                shelves.append(ShelfAssignment(cat_dims[0].spec.name, "color"))
+        # Format rate fields on axes
+        scatter_fmt = {}
+        if _is_rate_field(m1.spec.name):
+            scatter_fmt[f"{agg1}({m1.spec.name})"] = "0.00%"
+        if _is_rate_field(m2.spec.name):
+            scatter_fmt[f"{agg2}({m2.spec.name})"] = "0.00%"
         suggestions.append(ChartSuggestion(
             chart_type="Scatterplot",
-            title=f"Is there a relationship between {m1.spec.name} and {m2.spec.name}?",
+            title=f"{m2.spec.name} vs {m1.spec.name}",
             shelves=shelves,
             reason="Two numeric measures → scatter plot",
             priority=70,
+            text_format=scatter_fmt or None,
         ))
 
     # --- Geographic dim + Measure → Map ---
@@ -439,6 +463,9 @@ _default_aggregation = smart_aggregation
 def _is_rate_field(field_name: str) -> bool:
     """Return True if the field represents a rate/percentage/ratio."""
     lower = field_name.lower()
+    # Detect "% GDP", "% of Sales", etc. — the % symbol is a strong signal
+    if "%" in field_name:
+        return True
     return any(kw in lower for kw in _RATE_KEYWORDS)
 
 
@@ -446,8 +473,46 @@ def _is_currency_field(field_name: str) -> bool:
     """Return True if the field represents a monetary amount."""
     lower = field_name.lower()
     _CURRENCY_KW = {"sales", "revenue", "cost", "price", "amount", "profit",
-                    "income", "expense", "fee", "tax", "payment", "budget", "spend"}
+                    "income", "expense", "fee", "tax", "payment", "budget", "spend",
+                    "gdp", "wage", "salary", "debt", "investment", "capital"}
     return any(kw in lower for kw in _CURRENCY_KW)
+
+
+def _is_population_field(field_name: str) -> bool:
+    """Return True if the field represents a count of people/units (large numbers)."""
+    lower = field_name.lower()
+    _POP_KW = {"population", "headcount", "employees", "users", "subscribers",
+               "visitors", "customers"}
+    return any(kw in lower for kw in _POP_KW)
+
+
+def _smart_number_format(field_name: str, aggregation: str) -> str:
+    """Choose a human-friendly Tableau number format for KPI values.
+
+    Uses Tableau's comma-suffix trick to abbreviate large numbers:
+    - One comma divides by 1,000      → ``#,##0.0,"K"``
+    - Two commas divide by 1,000,000  → ``#,##0.0,,"M"``
+    - Three commas divide by 1B       → ``#,##0.0,,,"B"``
+
+    For currency fields the ``$`` prefix is prepended.
+    For rate/percentage fields ``0.00%`` is used.
+    For population/large-count fields ``#,##0.0,,,"B"`` (or "M") is used.
+    """
+    if _is_rate_field(field_name):
+        return "0.00%"
+
+    # Currency fields: always abbreviate to avoid overflow ("############")
+    if _is_currency_field(field_name):
+        if aggregation == "AVG":
+            return "$#,##0"  # averages are usually small
+        return '$#,##0.0,,,"B"'  # SUM of revenue/sales → likely billions/millions
+
+    # Population / large-count fields
+    if _is_population_field(field_name):
+        return '#,##0.0,,,"B"'
+
+    # Generic large number: use standard formatting with commas
+    return "#,##0"
 
 
 def _kpi_title(aggregation: str, field_name: str) -> str:
