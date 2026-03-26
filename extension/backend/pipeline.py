@@ -298,7 +298,10 @@ def generate_workbook(
                     chart_kwargs[shelf_key] = _resolve_field(val)
 
         if auto_filters:
-            chart_kwargs["filters"] = auto_filters
+            # Merge auto_filters with any existing filters (e.g. Top N)
+            # instead of overwriting — Top N filters were added above.
+            existing = chart_kwargs.get("filters") or []
+            chart_kwargs["filters"] = list(existing) + list(auto_filters)
         print(f"[PIPELINE]   kwargs: {chart_kwargs}")
         try:
             editor.configure_chart(ws_name, **chart_kwargs)
