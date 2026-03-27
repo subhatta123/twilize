@@ -1,0 +1,292 @@
+{
+  "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/servers/main/schema/mcp-server.schema.json",
+  "id": "com.twilize.mcp-server",
+  "name": "twilize",
+  "version": "0.13.0",
+  "description": "Tableau Workbook (.twb/.twbx) generation MCP server — programmatically create Tableau workbooks with stable analytical primitives, dashboard composition, and built-in structural validation.",
+  "author": {
+    "name": "Suddhasheel Bhattacharya",
+    "email": "suddhasheel.bhattacharya@gmail.com",
+    "organization": "Twilize",
+    "url": "https://github.com/subhatta123/twilize"
+  },
+  "license": "AGPL-3.0-or-later",
+  "homepage": "https://github.com/subhatta123/twilize",
+  "repository": "https://github.com/subhatta123/twilize",
+  "icon": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR4nGPwq1xBEmIY1TCqYfhqAADB728Q87YUCwAAAABJRU5ErkJggg==",
+  "categories": ["visualization", "data", "tableau", "business-intelligence"],
+  "keywords": ["tableau", "twb", "twbx", "mcp", "visualization", "workbook", "dashboard", "charts", "bi"],
+  "runtime": "python",
+  "minPythonVersion": "3.10",
+  "transport": "stdio",
+  "install": {
+    "pip": "twilize",
+    "uvx": "twilize"
+  },
+  "command": {
+    "default": "uvx twilize",
+    "alternatives": [
+      "python -m twilize",
+      "twilize"
+    ]
+  },
+  "permissions": [
+    "file-read",
+    "file-write"
+  ],
+  "tools": [
+    {
+      "name": "create_workbook",
+      "description": "Create a new workbook from a TWB or TWBX template file",
+      "category": "workbook-management"
+    },
+    {
+      "name": "open_workbook",
+      "description": "Open an existing workbook (.twb or .twbx) for in-place worksheet editing",
+      "category": "workbook-management"
+    },
+    {
+      "name": "save_workbook",
+      "description": "Save the workbook as TWB (XML) or TWBX (ZIP with bundled extracts/images)",
+      "category": "workbook-management"
+    },
+    {
+      "name": "list_fields",
+      "description": "List all available dimensions and measures in the current datasource",
+      "category": "workbook-management"
+    },
+    {
+      "name": "list_worksheets",
+      "description": "List worksheet names in the active workbook",
+      "category": "workbook-management"
+    },
+    {
+      "name": "list_dashboards",
+      "description": "List dashboards and their worksheet zones",
+      "category": "workbook-management"
+    },
+    {
+      "name": "undo_last_change",
+      "description": "Undo the last mutating operation, restoring the previous workbook state",
+      "category": "workbook-management"
+    },
+    {
+      "name": "add_calculated_field",
+      "description": "Add a calculated field with Tableau formula to the datasource",
+      "category": "fields"
+    },
+    {
+      "name": "remove_calculated_field",
+      "description": "Remove a previously added calculated field",
+      "category": "fields"
+    },
+    {
+      "name": "add_parameter",
+      "description": "Add an interactive parameter for what-if analysis",
+      "category": "fields"
+    },
+    {
+      "name": "add_worksheet",
+      "description": "Add a new blank worksheet to the workbook",
+      "category": "charts"
+    },
+    {
+      "name": "configure_chart",
+      "description": "Configure chart type and field mappings for a worksheet (Bar, Line, Area, Pie, Map, Scatter, Heatmap, TreeMap, Bubble, Text/KPI)",
+      "category": "charts"
+    },
+    {
+      "name": "configure_dual_axis",
+      "description": "Configure a dual-axis chart composition with two overlaid mark types",
+      "category": "charts"
+    },
+    {
+      "name": "configure_chart_recipe",
+      "description": "Configure a showcase recipe chart (Donut, Lollipop, Bullet, Bump, Butterfly, Calendar)",
+      "category": "charts"
+    },
+    {
+      "name": "configure_worksheet_style",
+      "description": "Apply worksheet-level styling: background color, axis/grid/border visibility, cell formats",
+      "category": "charts"
+    },
+    {
+      "name": "add_reference_line",
+      "description": "Add a reference line to a worksheet (constant, average, median, etc.)",
+      "category": "charts"
+    },
+    {
+      "name": "add_reference_band",
+      "description": "Add a reference band (shaded region) to a worksheet",
+      "category": "charts"
+    },
+    {
+      "name": "add_trend_line",
+      "description": "Add a trend line to a worksheet (linear, polynomial, log, exp, power)",
+      "category": "charts"
+    },
+    {
+      "name": "apply_color_palette",
+      "description": "Set a custom or built-in color palette (tableau10, tableau20, blue-red, green-gold)",
+      "category": "charts"
+    },
+    {
+      "name": "add_dashboard",
+      "description": "Create a dashboard combining multiple worksheets with layout control",
+      "category": "dashboards"
+    },
+    {
+      "name": "add_dashboard_action",
+      "description": "Add filter or highlight interaction actions to a dashboard",
+      "category": "dashboards"
+    },
+    {
+      "name": "apply_dashboard_theme",
+      "description": "Apply uniform styling (background, font) to all zones in a dashboard",
+      "category": "dashboards"
+    },
+    {
+      "name": "generate_layout_json",
+      "description": "Build a structured dashboard flexbox layout JSON file",
+      "category": "dashboards"
+    },
+    {
+      "name": "set_mysql_connection",
+      "description": "Configure the datasource to use a local MySQL connection",
+      "category": "connections"
+    },
+    {
+      "name": "set_tableauserver_connection",
+      "description": "Configure connection to an online Tableau Server",
+      "category": "connections"
+    },
+    {
+      "name": "set_hyper_connection",
+      "description": "Configure the datasource to use a local Hyper extract",
+      "category": "connections"
+    },
+    {
+      "name": "inspect_target_schema",
+      "description": "Inspect the schema of a target Excel or Hyper datasource",
+      "category": "connections"
+    },
+    {
+      "name": "list_capabilities",
+      "description": "Show twilize's declared capability boundary (core/advanced/recipe/unsupported)",
+      "category": "analysis"
+    },
+    {
+      "name": "describe_capability",
+      "description": "Explain whether a specific chart or feature is core, advanced, recipe, or unsupported",
+      "category": "analysis"
+    },
+    {
+      "name": "analyze_twb",
+      "description": "Analyze a TWB file against the capability catalog with gap triage",
+      "category": "analysis"
+    },
+    {
+      "name": "diff_template_gap",
+      "description": "Summarize the non-core capability gap of a TWB template",
+      "category": "analysis"
+    },
+    {
+      "name": "validate_workbook",
+      "description": "Validate a workbook against the official Tableau TWB XSD schema (2026.1)",
+      "category": "analysis"
+    },
+    {
+      "name": "inspect_csv",
+      "description": "Inspect a CSV file schema with column type inference and classification",
+      "category": "pipeline"
+    },
+    {
+      "name": "suggest_charts_for_csv",
+      "description": "Suggest chart types and configurations for a CSV file",
+      "category": "pipeline"
+    },
+    {
+      "name": "csv_to_hyper",
+      "description": "Convert a CSV file to a Tableau Hyper extract",
+      "category": "pipeline"
+    },
+    {
+      "name": "csv_to_dashboard",
+      "description": "Build a complete Tableau dashboard from a CSV file (end-to-end pipeline)",
+      "category": "pipeline"
+    },
+    {
+      "name": "profile_twb_for_migration",
+      "description": "Profile workbook datasources and worksheet scope before migration",
+      "category": "migration"
+    },
+    {
+      "name": "propose_field_mapping",
+      "description": "Fuzzy-match source fields to target fields with confidence scores",
+      "category": "migration"
+    },
+    {
+      "name": "preview_twb_migration",
+      "description": "Dry-run a migration: report blockers, warnings, and rewrite summary",
+      "category": "migration"
+    },
+    {
+      "name": "apply_twb_migration",
+      "description": "Apply a workbook migration and write a migrated TWB plus reports",
+      "category": "migration"
+    },
+    {
+      "name": "migrate_twb_guided",
+      "description": "Run the built-in migration workflow with automatic pause for warning confirmation",
+      "category": "migration"
+    }
+  ],
+  "resources": [
+    {
+      "uri": "file://docs/tableau_all_functions.json",
+      "description": "Complete list of Tableau calculation functions with syntax and examples"
+    },
+    {
+      "uri": "twilize://skills/index",
+      "description": "Markdown index listing all available agent skill files"
+    },
+    {
+      "uri": "twilize://skills/{skill_name}",
+      "description": "Agent skill guides: calculation_builder, chart_builder, dashboard_designer, formatting"
+    }
+  ],
+  "clientConfigurations": {
+    "claude-desktop": {
+      "configPath": {
+        "macos": "~/Library/Application Support/Claude/claude_desktop_config.json",
+        "windows": "%APPDATA%\\Claude\\claude_desktop_config.json"
+      },
+      "config": {
+        "mcpServers": {
+          "twilize": {
+            "command": "uvx",
+            "args": ["twilize"]
+          }
+        }
+      }
+    },
+    "cursor": {
+      "type": "command",
+      "name": "twilize",
+      "command": "uvx twilize"
+    },
+    "claude-code": {
+      "command": "claude mcp add twilize -- uvx twilize"
+    },
+    "vscode": {
+      "config": {
+        "servers": {
+          "twilize": {
+            "command": "uvx",
+            "args": ["twilize"]
+          }
+        }
+      }
+    }
+  }
+}

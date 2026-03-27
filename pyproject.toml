@@ -5,18 +5,24 @@ description = "Tableau Workbook (.twb) generation toolkit and MCP server"
 authors = [{name = "Suddhasheel Bhattacharya", email = "suddhasheel.bhattacharya@gmail.com"}]
 readme = "README.md"
 
+license = "AGPL-3.0-or-later"
 requires-python = ">=3.10"
-keywords = ["tableau", "twb", "mcp", "visualization", "workbook"]
+keywords = ["tableau", "twb", "twbx", "mcp", "visualization", "workbook", "dashboard", "charts", "bi", "model-context-protocol"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Information Technology",
     "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Visualization",
+    "Topic :: Office/Business",
+    "Typing :: Typed",
 ]
 dependencies = [
     "lxml>=5.0",
@@ -52,7 +58,10 @@ twilize = "twilize.server:main"
 
 [project.urls]
 Homepage = "https://github.com/subhatta123/twilize"
-Changelog = "https://github.com/subhatta123/twilize/blob/master/CHANGELOG.md"
+Documentation = "https://github.com/subhatta123/twilize/blob/main/docs/MCP_SERVER.md"
+Repository = "https://github.com/subhatta123/twilize"
+Changelog = "https://github.com/subhatta123/twilize/blob/main/CHANGELOG.md"
+"Bug Tracker" = "https://github.com/subhatta123/twilize/issues"
 
 [build-system]
 requires = ["hatchling<1.27.0"]

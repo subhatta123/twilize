@@ -28,10 +28,16 @@ from .mcp.tools_workbook import (
     add_dashboard,
     add_dashboard_action,
     add_parameter,
+    add_reference_band,
+    add_reference_line,
+    add_trend_line,
     add_worksheet,
+    apply_color_palette,
+    apply_dashboard_theme,
     configure_chart,
     configure_chart_recipe,
     configure_dual_axis,
+    configure_worksheet_style,
     create_workbook,
     list_dashboards,
     list_fields,
@@ -42,6 +48,7 @@ from .mcp.tools_workbook import (
     set_hyper_connection,
     set_mysql_connection,
     set_tableauserver_connection,
+    undo_last_change,
 )
 
 

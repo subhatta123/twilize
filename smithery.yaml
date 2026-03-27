@@ -1,0 +1,131 @@
+# Smithery MCP Server Registry Configuration
+# https://smithery.ai/docs/publishing
+
+name: twilize
+displayName: "Twilize — Tableau Workbook Builder"
+description: >
+  Tableau Workbook (.twb/.twbx) generation MCP server.
+  Programmatically create Tableau workbooks with stable analytical primitives,
+  dashboard composition, and built-in structural validation.
+  Supports 10+ chart types, dual-axis compositions, recipe charts,
+  calculated fields, parameters, dashboard actions, and workbook migration.
+
+version: "0.13.0"
+license: AGPL-3.0-or-later
+
+author:
+  name: Suddhasheel Bhattacharya
+  email: suddhasheel.bhattacharya@gmail.com
+  url: https://github.com/subhatta123/twilize
+
+repository: https://github.com/subhatta123/twilize
+homepage: https://github.com/subhatta123/twilize
+
+categories:
+  - visualization
+  - data
+  - business-intelligence
+
+tags:
+  - tableau
+  - twb
+  - twbx
+  - dashboards
+  - charts
+  - workbook
+  - bi
+  - data-visualization
+  - mcp
+
+runtime: python
+minRuntimeVersion: "3.10"
+
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties: {}
+  commandFunction: |-
+    (config) => ({
+      command: "uvx",
+      args: ["twilize"]
+    })
+
+installInstructions: |
+  ## Installation
+
+  Install from PyPI:
+  ```bash
+  pip install twilize
+  ```
+
+  Or run directly with uvx (no install needed):
+  ```bash
+  uvx twilize
+  ```
+
+  ### Optional dependencies
+
+  ```bash
+  pip install "twilize[pipeline]"    # CSV-to-Hyper conversion
+  pip install "twilize[examples]"    # Hyper-backed examples
+  pip install "twilize[extension]"   # Tableau Dashboard Extension backend
+  ```
+
+  ## Client Configuration
+
+  ### Claude Desktop
+  Add to `claude_desktop_config.json`:
+  ```json
+  {
+    "mcpServers": {
+      "twilize": {
+        "command": "uvx",
+        "args": ["twilize"]
+      }
+    }
+  }
+  ```
+
+  ### Claude Code
+  ```bash
+  claude mcp add twilize -- uvx twilize
+  ```
+
+  ### Cursor IDE
+  Settings → Features → MCP → Add New MCP Server
+  - Type: command
+  - Name: twilize
+  - Command: uvx twilize
+
+  ### VS Code
+  Add to `.vscode/mcp.json`:
+  ```json
+  {
+    "servers": {
+      "twilize": {
+        "command": "uvx",
+        "args": ["twilize"]
+      }
+    }
+  }
+  ```
+
+features:
+  - 40 MCP tools across 7 categories
+  - 10+ chart types (Bar, Line, Area, Pie, Map, Scatter, Heatmap, TreeMap, Bubble, Text/KPI)
+  - Dual-axis chart compositions
+  - 6 recipe charts (Donut, Lollipop, Bullet, Bump, Butterfly, Calendar)
+  - Dashboard composition with flexible layouts
+  - Filter and highlight dashboard actions
+  - Calculated fields with full Tableau formula support
+  - Interactive parameters (range, list)
+  - Reference lines, bands, and trend lines
+  - Custom and built-in color palettes
+  - Workbook migration between datasources
+  - CSV-to-dashboard end-to-end pipeline
+  - XSD schema validation (Tableau 2026.1)
+  - Undo/rollback support
+  - .twb and .twbx (packaged workbook) support
+  - MySQL, Tableau Server, and Hyper extract connections
+  - Agent skill resources for guided workflows

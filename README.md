@@ -501,6 +501,42 @@ python examples/migrate_workflow/test_migration_workflow.py
 twilize
 ```
 
+## MCP Server Manifest
+
+twilize ships with a full MCP server manifest (`mcp-server.json`) — the MCP equivalent of a Tableau Extension `.trex` file. It declares:
+
+| .trex Equivalent | MCP Field | Description |
+|---|---|---|
+| Extension ID | `id` | `com.twilize.mcp-server` |
+| Version | `version` | Current package version |
+| Name / Description | `name`, `description` | Server identity |
+| Author | `author` | Name, email, org, URL |
+| Permissions | `permissions` | `file-read`, `file-write` |
+| Source URL | `command` | `uvx twilize` |
+| Min API version | `minPythonVersion` | `3.10` |
+
+Additionally, the manifest declares all 40 tools with categories, 6 resources, and pre-built client configurations for Claude Desktop, Cursor, VS Code, and Claude Code.
+
+For the complete tool reference with parameter schemas, see [docs/MCP_SERVER.md](docs/MCP_SERVER.md).
+
+## Publishing
+
+### PyPI
+
+```bash
+pip install build twine
+python -m build
+twine upload dist/*
+```
+
+### Smithery MCP Registry
+
+The `smithery.yaml` file is ready for submission to [Smithery](https://smithery.ai).
+
+### MCP Server Registry
+
+The `mcp-server.json` file follows the MCP server schema for registry submission.
+
 ## License
 
 AGPL-3.0-or-later
