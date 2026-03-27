@@ -3,7 +3,7 @@
   "id": "com.twilize.mcp-server",
   "name": "twilize",
   "version": "0.13.0",
-  "description": "Tableau Workbook (.twb/.twbx) generation MCP server — programmatically create Tableau workbooks with stable analytical primitives, dashboard composition, and built-in structural validation.",
+  "description": "Tableau Workbook (.twb/.twbx) generation MCP server with 41 tools for charts and dashboards",
   "author": {
     "name": "Suddhasheel Bhattacharya",
     "email": "suddhasheel.bhattacharya@gmail.com",
