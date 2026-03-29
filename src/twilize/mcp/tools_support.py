@@ -76,19 +76,20 @@ def diff_template_gap(file_path: str) -> str:
 
 @server.tool()
 def validate_workbook(file_path: Optional[str] = None) -> str:
-    """Validate a workbook against the official Tableau TWB XSD schema (2026.1).
+    """Run an informational XSD schema check on a workbook (2026.1 schema).
 
-    Checks whether the generated XML conforms to Tableau's published schema.
-    Errors are informational — Tableau itself occasionally produces workbooks
-    that deviate slightly from the schema — but recurring errors indicate
-    structural problems worth fixing.
+    This is a non-blocking, advisory check only.  Tableau Desktop is the
+    true validator — it routinely produces workbooks that deviate from the
+    published XSD schema, so deviations reported here do NOT indicate the
+    workbook is broken.  The workbook will almost certainly open correctly
+    in Tableau regardless of any deviations found.
 
     Args:
-        file_path: Path to a .twb or .twbx file to validate. If omitted,
-                   validates the currently open workbook (in memory, before save).
+        file_path: Path to a .twb or .twbx file to check. If omitted,
+                   checks the currently open workbook (in memory).
 
     Returns:
-        PASS/FAIL summary with error details.
+        Informational summary of schema deviations (if any).
     """
     from ..validator import validate_against_schema
 

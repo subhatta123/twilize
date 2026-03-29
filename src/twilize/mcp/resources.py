@@ -29,8 +29,6 @@ USAGE PATTERN (recommended by server instructions)
     read_resource("twilize://skills/dashboard_designer") # before add_dashboard
 """
 
-from __future__ import annotations
-
 from ..config import SKILLS_DIR, TABLEAU_FUNCTIONS_JSON
 from .app import server
 

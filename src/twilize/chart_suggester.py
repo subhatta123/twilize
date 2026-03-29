@@ -489,29 +489,25 @@ def _is_population_field(field_name: str) -> bool:
 def _smart_number_format(field_name: str, aggregation: str) -> str:
     """Choose a human-friendly Tableau number format for KPI values.
 
-    Uses Tableau's comma-suffix trick to abbreviate large numbers:
-    - One comma divides by 1,000      → ``#,##0.0,"K"``
-    - Two commas divide by 1,000,000  → ``#,##0.0,,"M"``
-    - Three commas divide by 1B       → ``#,##0.0,,,"B"``
+    Uses simple comma-separated formatting by default so that values
+    display correctly regardless of data magnitude.  Abbreviation
+    suffixes (K / M / B) are intentionally avoided because the engine
+    cannot inspect actual data values at suggestion time — using a
+    fixed divisor (e.g. ÷1 B) on smaller datasets causes ``########``
+    overflow or misleading "0.0B" labels.
 
-    For currency fields the ``$`` prefix is prepended.
-    For rate/percentage fields ``0.00%`` is used.
-    For population/large-count fields ``#,##0.0,,,"B"`` (or "M") is used.
+    For rate/percentage fields that are already stored as 0-1 decimals,
+    a 4-decimal format is used so the raw value is readable.
     """
     if _is_rate_field(field_name):
-        return "0.00%"
+        return "0.0000"  # show raw decimal (e.g. 0.1599), not percentage
 
-    # Currency fields: always abbreviate to avoid overflow ("############")
     if _is_currency_field(field_name):
-        if aggregation == "AVG":
-            return "$#,##0"  # averages are usually small
-        return '$#,##0.0,,,"B"'  # SUM of revenue/sales → likely billions/millions
+        return "#,##0"  # plain comma formatting — works for any magnitude
 
-    # Population / large-count fields
     if _is_population_field(field_name):
-        return '#,##0.0,,,"B"'
+        return "#,##0"
 
-    # Generic large number: use standard formatting with commas
     return "#,##0"
 
 
