@@ -1,0 +1,71 @@
+# =============================================================================
+# Geographic Explorer Template
+# =============================================================================
+# Map-centric layout with a large featured map zone and detail charts below.
+# Best for spatial analysis where location is central to the question.
+# =============================================================================
+
+name: "geo-explorer"
+description: "Map-centric layout with geographic drill-down"
+author: "twilize"
+
+suitability:
+  requires:
+    has_strong_geographic: true
+  prefers:
+    chart_type_present:
+      - "Map"
+    kpi_count_min: 1
+    kpi_count_max: 3
+    chart_count_min: 1
+    chart_count_max: 3
+  suited_for_domains:
+    - "logistics"
+    - "retail_sales"
+    - "real_estate"
+
+zones:
+  - zone_id: "title"
+    type: "text"
+    fixed_size: 70
+    position: "top"
+
+  - zone_id: "kpi_row"
+    type: "kpi_container"
+    direction: "horizontal"
+    fixed_size: 80
+    max_slots: 3
+    position: "top"
+
+  - zone_id: "featured_map"
+    type: "worksheet"
+    weight: 3
+    preferred_chart_types:
+      - "Map"
+    position: "center"
+
+  - zone_id: "detail_row"
+    type: "chart_container"
+    direction: "horizontal"
+    weight: 1
+    slots: 2
+    preferred_chart_types:
+      - "Bar"
+      - "Line"
+
+  - zone_id: "filter_sidebar"
+    type: "filter_panel"
+    position: "right"
+    fixed_size: 140
+
+recommended_theme: "corporate-blue"
+
+auto_actions:
+  - type: "filter"
+    from: "featured_map"
+    to: "detail_row"
+    on: "on-select"
+  - type: "highlight"
+    from: "detail_row"
+    to: "featured_map"
+    on: "on-select"

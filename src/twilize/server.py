@@ -23,6 +23,14 @@ from .mcp.tools_pipeline import (
     inspect_csv,
     suggest_charts_for_csv,
 )
+from .mcp.tools_intelligence import (
+    get_active_rules,
+    list_gallery_templates,
+    profile_csv,
+    profile_data_source,
+    recommend_template,
+    recommend_template_for_csv,
+)
 from .mcp.tools_workbook import (
     add_calculated_field,
     add_dashboard,

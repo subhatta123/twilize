@@ -1,0 +1,243 @@
+# =============================================================================
+# Twilize Dashboard Creation Rules
+# =============================================================================
+# Plain-English rules enforced at tool execution time.
+# Edit this file to change how dashboards are built — no Python needed.
+#
+# Rule severities:
+#   error   — blocks the tool call, must be fixed before proceeding
+#   warning — appended to tool response, agent should address but not blocked
+#   info    — logged, no action required
+# =============================================================================
+
+version: 1
+
+# ---------------------------------------------------------------------------
+# KPI / Big Ass Number Rules
+# ---------------------------------------------------------------------------
+kpi_rules:
+  max_kpis_per_dashboard: 4
+  max_metrics_per_kpi_card: 5
+  placement: "top_row"
+  fixed_height_px_min: 40
+  fixed_height_px_max: 100
+  require_comparison_context: true   # should show vs-prior or vs-target
+  ordering: "primary_metric_first_then_ratios_then_volume"
+  severity: "warning"
+
+  # Short display names — the rules engine replaces verbose expressions
+  # in KPI titles with concise labels.
+  shorten_names:
+    "SUM(Sales)": "Sales"
+    "SUM(Profit)": "Profit"
+    "SUM(Quantity)": "Quantity"
+    "SUM(Revenue)": "Revenue"
+    "SUM(Cost)": "Cost"
+    "AVG(Discount)": "Avg Discount"
+    "AVG(Satisfaction)": "Satisfaction"
+    "COUNTD(Order ID)": "Orders"
+    "COUNTD(Customer ID)": "Customers"
+    "COUNTD(Product ID)": "Products"
+
+# ---------------------------------------------------------------------------
+# Chart Count & Composition Rules
+# ---------------------------------------------------------------------------
+chart_count_rules:
+  max_charts_per_dashboard: 5        # including KPIs
+  max_chart_types_per_dashboard: 3   # e.g. Bar + Line + Map = 3
+  require_at_least_one_kpi: true
+  severity: "error"
+
+# ---------------------------------------------------------------------------
+# Map Rules
+# ---------------------------------------------------------------------------
+map_rules:
+  min_geo_coverage_pct: 80           # reject if >20% null geo values
+  min_unique_locations: 4            # don't map 2-3 regions — use bar
+  required_encodings:
+    - "color"
+    - "tooltip"
+  warn_if_no_legend: true
+  severity: "warning"
+
+  # Conditions under which a bar chart should be used instead of a map
+  prefer_bar_chart_when:
+    - "question_is_ranking_by_region"
+    - "precise_value_comparison_needed"
+    - "fewer_than_4_geographic_values"
+
+# ---------------------------------------------------------------------------
+# Theme Rules
+# ---------------------------------------------------------------------------
+theme_rules:
+  require_theme: true
+  default_theme: "modern-light"
+  apply_to_all_dashboards: true
+  color_accessibility: "colorblind_safe"   # reject red-green combos
+  severity: "warning"
+
+  # Default styling constants (overridable by theme presets)
+  defaults:
+    background: "#e6e6e6"
+    card_background: "#ffffff"
+    filter_bar_background: "#192f3e"
+    font_family: "Tableau Book"
+
+# ---------------------------------------------------------------------------
+# Bar Chart Rules
+# ---------------------------------------------------------------------------
+bar_chart_rules:
+  must_sort_descending: true
+  axis_starts_at_zero: true
+  max_categories: 15
+  prefer_horizontal: true
+  never_for_time_series: true
+  auto_fix_sort: true                # auto-add sort_descending if missing
+  severity: "warning"
+
+# ---------------------------------------------------------------------------
+# Line Chart Rules
+# ---------------------------------------------------------------------------
+line_chart_rules:
+  only_for_temporal_data: true
+  max_color_series: 6
+  require_continuous_axis: true
+  severity: "warning"
+
+# ---------------------------------------------------------------------------
+# Pie Chart Rules
+# ---------------------------------------------------------------------------
+pie_chart_rules:
+  max_slices: 5
+  require_sum_to_100: true
+  suggest_bar_chart_above: 5
+  severity: "warning"
+
+# ---------------------------------------------------------------------------
+# Scatter Plot Rules
+# ---------------------------------------------------------------------------
+scatter_plot_rules:
+  min_data_points: 15
+  min_color_cardinality: 6
+  suggest_bar_chart_below: 6
+  severity: "warning"
+
+# ---------------------------------------------------------------------------
+# Layout Rules
+# ---------------------------------------------------------------------------
+layout_rules:
+  require_information_hierarchy: true
+  kpi_position: "top"
+  primary_view_position: "center"
+  filter_sidebar_position: "right"
+  filter_sidebar_width_px_min: 120
+  filter_sidebar_width_px_max: 200
+  require_at_least_one_filter_action: true
+  require_filter_sidebar: true
+  max_dashboard_width: 1400
+  max_dashboard_height: 900
+  severity: "warning"
+
+# ---------------------------------------------------------------------------
+# Aggregation Rules
+# ---------------------------------------------------------------------------
+aggregation_rules:
+  auto_detect_from_name: true
+  severity: "info"
+
+  # Field-name keyword → aggregation mapping
+  rates_and_percentages:
+    aggregation: "AVG"
+    keywords:
+      - "discount"
+      - "margin"
+      - "rate"
+      - "ratio"
+      - "percentage"
+      - "pct"
+      - "share"
+      - "yield"
+      - "efficiency"
+      - "conversion"
+      - "bounce"
+      - "churn"
+      - "retention"
+      - "satisfaction"
+      - "score"
+      - "rating"
+
+  amounts_and_values:
+    aggregation: "SUM"
+    keywords:
+      - "sales"
+      - "profit"
+      - "revenue"
+      - "cost"
+      - "price"
+      - "amount"
+      - "total"
+      - "budget"
+      - "spend"
+      - "income"
+      - "expense"
+
+  counts_and_quantities:
+    aggregation: "SUM"
+    keywords:
+      - "quantity"
+      - "orders"
+      - "number"
+      - "transactions"
+      - "visits"
+      - "clicks"
+
+  identifiers:
+    aggregation: "COUNTD"
+    keywords:
+      - "id"
+      - "key"
+      - "code"
+      - "identifier"
+      - "uuid"
+
+# ---------------------------------------------------------------------------
+# Number Format Rules
+# ---------------------------------------------------------------------------
+number_format_rules:
+  auto_detect_from_name: true
+  severity: "info"
+
+  mappings:
+    currency: "$#,##0"
+    percentage: "p0.00%"
+    integer: "#,##0"
+    decimal: "#,##0.00"
+
+  # Field-name keyword → format type
+  field_patterns:
+    currency:
+      - "sales"
+      - "profit"
+      - "revenue"
+      - "cost"
+      - "price"
+      - "amount"
+      - "budget"
+      - "income"
+      - "expense"
+    percentage:
+      - "rate"
+      - "ratio"
+      - "pct"
+      - "percentage"
+      - "margin"
+      - "discount"
+      - "share"
+      - "churn"
+      - "conversion"
+    integer:
+      - "count"
+      - "quantity"
+      - "number"
+      - "orders"
+      - "visits"

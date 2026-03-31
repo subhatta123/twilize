@@ -2,8 +2,8 @@
   "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/servers/main/schema/mcp-server.schema.json",
   "id": "com.twilize.mcp-server",
   "name": "twilize",
-  "version": "0.13.0",
-  "description": "Tableau Workbook (.twb/.twbx) generation MCP server with 41 tools for charts and dashboards",
+  "version": "0.14.0",
+  "description": "Tableau Workbook (.twb/.twbx) generation MCP server with 47 tools for charts, dashboards, rules engine, and intelligent template selection",
   "author": {
     "name": "Suddhasheel Bhattacharya",
     "email": "suddhasheel.bhattacharya@gmail.com",
@@ -194,6 +194,36 @@
       "name": "validate_workbook",
       "description": "Validate a workbook against the official Tableau TWB XSD schema (2026.1)",
       "category": "analysis"
+    },
+    {
+      "name": "get_active_rules",
+      "description": "Return the active dashboard creation rules (YAML-driven constraints enforced at tool level)",
+      "category": "intelligence"
+    },
+    {
+      "name": "profile_data_source",
+      "description": "Profile the currently connected data source (works for CSV, Hyper, MySQL, Tableau Server, or any source)",
+      "category": "intelligence"
+    },
+    {
+      "name": "profile_csv",
+      "description": "Profile a CSV file before connecting it (standalone, no active workbook needed)",
+      "category": "intelligence"
+    },
+    {
+      "name": "recommend_template",
+      "description": "Score all gallery templates against data profile and chart mix, return ranked recommendations",
+      "category": "intelligence"
+    },
+    {
+      "name": "recommend_template_for_csv",
+      "description": "Recommend layout templates for a CSV file (standalone, no active workbook needed)",
+      "category": "intelligence"
+    },
+    {
+      "name": "list_gallery_templates",
+      "description": "List all templates in the gallery with suitability rules and zone descriptions",
+      "category": "intelligence"
     },
     {
       "name": "inspect_csv",

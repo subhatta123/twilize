@@ -1,0 +1,57 @@
+# =============================================================================
+# Executive Briefing Template
+# =============================================================================
+# KPI-heavy board-level overview with large BAN numbers.
+# Minimal charts, maximum KPI visibility. For C-suite audiences.
+# =============================================================================
+
+name: "executive-briefing"
+description: "KPI-heavy board-level overview with large BAN numbers"
+author: "twilize"
+
+suitability:
+  requires: {}
+  prefers:
+    kpi_count_min: 3
+    kpi_count_max: 6
+    chart_count_min: 1
+    chart_count_max: 2
+  suited_for_domains:
+    - "finance"
+    - "retail_sales"
+    - "hr"
+
+zones:
+  - zone_id: "title"
+    type: "text"
+    fixed_size: 70
+    position: "top"
+
+  - zone_id: "filter_bar"
+    type: "filter_panel"
+    position: "top"
+    fixed_size: 30
+    style: "horizontal"
+
+  - zone_id: "kpi_grid"
+    type: "kpi_container"
+    direction: "horizontal"
+    fixed_size: 200
+    max_slots: 6
+    position: "top"
+
+  - zone_id: "single_chart"
+    type: "worksheet"
+    weight: 1
+    preferred_chart_types:
+      - "Bar"
+      - "Line"
+      - "Map"
+
+recommended_theme: "minimal"
+
+auto_actions:
+  - type: "filter"
+    from: "single_chart"
+    to: "kpi_grid"
+    on: "on-select"
