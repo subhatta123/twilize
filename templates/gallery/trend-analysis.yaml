@@ -1,0 +1,72 @@
+# =============================================================================
+# Trend Analysis Template
+# =============================================================================
+# Time-series focused with a prominent trend chart and comparison panels.
+# Best for temporal data with strong date coverage.
+# =============================================================================
+
+name: "trend-analysis"
+description: "Time-series focused with comparison panels"
+author: "twilize"
+
+suitability:
+  requires:
+    has_strong_temporal: true
+  prefers:
+    chart_type_present:
+      - "Line"
+      - "Area"
+    chart_count_min: 2
+    chart_count_max: 4
+    kpi_count_min: 2
+    kpi_count_max: 4
+  suited_for_domains:
+    - "finance"
+    - "marketing"
+    - "operations"
+    - "retail_sales"
+
+zones:
+  - zone_id: "title"
+    type: "text"
+    fixed_size: 70
+    position: "top"
+
+  - zone_id: "filter_bar"
+    type: "filter_panel"
+    position: "top"
+    fixed_size: 30
+    style: "horizontal"
+
+  - zone_id: "kpi_row"
+    type: "kpi_container"
+    direction: "horizontal"
+    fixed_size: 60
+    max_slots: 4
+    position: "top"
+
+  - zone_id: "primary_trend"
+    type: "worksheet"
+    weight: 2
+    preferred_chart_types:
+      - "Line"
+      - "Area"
+    position: "center"
+
+  - zone_id: "comparison_row"
+    type: "chart_container"
+    direction: "horizontal"
+    weight: 1
+    slots: 2
+    preferred_chart_types:
+      - "Bar"
+      - "Line"
+      - "Pie"
+
+recommended_theme: "modern-light"
+
+auto_actions:
+  - type: "highlight"
+    from: "primary_trend"
+    to: "comparison_row"
+    on: "on-select"

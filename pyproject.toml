@@ -1,6 +1,6 @@
 [project]
 name = "twilize"
-version = "0.13.1"
+version = "0.14.0"
 description = "Tableau Workbook (.twb) generation toolkit and MCP server"
 authors = [{name = "Suddhasheel Bhattacharya", email = "suddhasheel.bhattacharya@gmail.com"}]
 readme = "README.md"
@@ -28,6 +28,7 @@ dependencies = [
     "lxml>=5.0",
     "mcp[cli]>=1.0",
     "xlrd>=2.0",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]

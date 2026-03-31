@@ -268,7 +268,36 @@ def configure_chart(
     _snapshot("configure_chart")
     editor = get_editor()
     _validate_worksheet_exists(editor, worksheet_name)
-    return editor.configure_chart(
+
+    # --- Rules Engine: pre-check & auto-fix ---
+    kwargs = dict(
+        mark_type=mark_type, columns=columns or [], rows=rows or [],
+        color=color, size=size, label=label, detail=detail,
+        wedge_size=wedge_size, sort_descending=sort_descending,
+        tooltip=tooltip, filters=filters,
+        geographic_field=geographic_field,
+        measure_values=measure_values or [],
+        map_fields=map_fields,
+    )
+    rule_warnings = ""
+    try:
+        from ..rules_engine import get_rules_engine
+        engine = get_rules_engine()
+        violations = engine.check_configure_chart(kwargs)
+        errors = engine.errors(violations)
+        if errors:
+            return "BLOCKED BY RULES:\n" + engine.format_violations(errors)
+        warnings = engine.warnings(violations)
+        if warnings:
+            rule_warnings = "\n\n" + engine.format_violations(warnings)
+        # Auto-fix (e.g. add sort_descending to bar charts)
+        fixed = engine.auto_fix_configure_chart(kwargs)
+        sort_descending = fixed.get("sort_descending", sort_descending)
+        measure_values = fixed.get("measure_values", measure_values)
+    except Exception:
+        pass  # Rules engine is optional — don't block on import/load errors
+
+    result = editor.configure_chart(
         worksheet_name=worksheet_name,
         mark_type=mark_type,
         columns=columns,
@@ -293,6 +322,7 @@ def configure_chart(
         label_runs=label_runs,
         label_param=label_param,
     )
+    return result + rule_warnings
 
 
 @server.tool()
@@ -514,13 +544,30 @@ def add_dashboard(
     _snapshot("add_dashboard")
     editor = get_editor()
     _validate_worksheets_exist(editor, worksheet_names)
-    return editor.add_dashboard(
+
+    # --- Rules Engine: pre-check ---
+    rule_warnings = ""
+    try:
+        from ..rules_engine import get_rules_engine
+        engine = get_rules_engine()
+        violations = engine.check_add_dashboard(worksheet_names, layout)
+        errors = engine.errors(violations)
+        if errors:
+            return "BLOCKED BY RULES:\n" + engine.format_violations(errors)
+        warnings = engine.warnings(violations)
+        if warnings:
+            rule_warnings = "\n\n" + engine.format_violations(warnings)
+    except Exception:
+        pass  # Rules engine is optional
+
+    result = editor.add_dashboard(
         dashboard_name=dashboard_name,
         width=width,
         height=height,
         layout=layout,
         worksheet_names=worksheet_names,
     )
+    return result + rule_warnings
 
 
 @server.tool()

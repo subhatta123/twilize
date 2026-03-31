@@ -1,0 +1,68 @@
+# =============================================================================
+# KPI Detail Template
+# =============================================================================
+# KPI row + one large featured chart + supporting detail row.
+# Best when there is a single primary analytical view with supporting context.
+# =============================================================================
+
+name: "kpi-detail"
+description: "KPI row + featured chart + detail row"
+author: "twilize"
+
+suitability:
+  requires: {}
+  prefers:
+    kpi_count_min: 2
+    kpi_count_max: 5
+    chart_count_min: 2
+    chart_count_max: 3
+  suited_for_domains:
+    - "retail_sales"
+    - "finance"
+    - "operations"
+
+zones:
+  - zone_id: "title"
+    type: "text"
+    fixed_size: 70
+    position: "top"
+
+  - zone_id: "filter_bar"
+    type: "filter_panel"
+    position: "top"
+    fixed_size: 30
+    style: "horizontal"
+
+  - zone_id: "kpi_row"
+    type: "kpi_container"
+    direction: "horizontal"
+    fixed_size: 100
+    max_slots: 5
+    position: "top"
+
+  - zone_id: "featured_chart"
+    type: "worksheet"
+    weight: 2
+    preferred_chart_types:
+      - "Line"
+      - "Map"
+      - "Area"
+      - "Bar"
+
+  - zone_id: "detail_row"
+    type: "chart_container"
+    direction: "horizontal"
+    weight: 1
+    slots: 2
+    preferred_chart_types:
+      - "Bar"
+      - "Pie"
+      - "Heatmap"
+
+recommended_theme: "modern-light"
+
+auto_actions:
+  - type: "filter"
+    from: "featured_chart"
+    to: "detail_row"
+    on: "on-select"

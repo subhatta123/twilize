@@ -1,0 +1,60 @@
+# =============================================================================
+# Left Filter Panel Template
+# =============================================================================
+# Vertical filter sidebar on the left + main content area with KPIs and charts.
+# Best when the dashboard has many filter dimensions (>3 filters).
+# =============================================================================
+
+name: "left-filter"
+description: "Left filter sidebar + KPIs + charts (many-filter dashboards)"
+author: "twilize"
+
+suitability:
+  requires: {}
+  prefers:
+    filter_count_min: 3
+    kpi_count_min: 2
+    kpi_count_max: 4
+    chart_count_min: 2
+    chart_count_max: 4
+  suited_for_domains:
+    - "retail_sales"
+    - "healthcare"
+    - "logistics"
+
+zones:
+  - zone_id: "filter_sidebar"
+    type: "filter_panel"
+    position: "left"
+    fixed_size: 200
+
+  - zone_id: "title"
+    type: "text"
+    fixed_size: 70
+    position: "top"
+
+  - zone_id: "kpi_row"
+    type: "kpi_container"
+    direction: "horizontal"
+    fixed_size: 100
+    max_slots: 4
+    position: "top"
+
+  - zone_id: "chart_grid"
+    type: "chart_container"
+    direction: "grid_2col"
+    weight: 1
+    slots: 4
+    preferred_chart_types:
+      - "Bar"
+      - "Line"
+      - "Area"
+      - "Pie"
+
+recommended_theme: "corporate-blue"
+
+auto_actions:
+  - type: "filter"
+    from: "chart_grid.0"
+    to: "all_others"
+    on: "on-select"
