@@ -126,6 +126,11 @@ class ThemesMixin:
         changes = 0
         for zone in zones.findall(".//zone"):
             if background_color:
+                # Skip worksheet zones — their styling is set by the C3 template
+                # and YAML rules.  Worksheet zones have a "name" attribute
+                # (the worksheet name) that layout-flow containers don't.
+                if zone.get("name") and zone.get("type-v2") != "layout-flow":
+                    continue
                 # Format elements must go inside <zone-style>, not directly in <zone>
                 zone_style = zone.find("zone-style")
                 if zone_style is None:

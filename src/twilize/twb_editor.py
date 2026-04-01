@@ -529,10 +529,18 @@ class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin,
 
         Worksheet windows use <cards> structure.
         Dashboard windows use <viewpoints> + <active> structure (per c.2 (2) reference).
+
+        If a window with the same name already exists it is removed first
+        to prevent the XSD "duplicate identity constraint" error (D2E8DA72).
         """
         windows = self.root.find("windows")
         if windows is None:
             windows = etree.SubElement(self.root, "windows")
+
+        # Remove any pre-existing window with the same name to avoid duplicates
+        for existing in windows.findall("window"):
+            if existing.get("name") == name:
+                windows.remove(existing)
 
         win = etree.SubElement(windows, "window")
         win.set("class", window_class)
@@ -579,6 +587,24 @@ class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin,
         # Add simple-id (must be at the end according to schema)
         simple_id = etree.SubElement(win, "simple-id")
         simple_id.set("uuid", _generate_uuid())
+
+    def _deduplicate_windows(self) -> None:
+        """Remove duplicate ``<window>`` entries from ``<windows>``.
+
+        Keeps the LAST window for each name (the most recently added one).
+        This is a safety net called before save() to guarantee the XSD
+        unique-identity constraint is never violated.
+        """
+        windows = self.root.find("windows")
+        if windows is None:
+            return
+        seen: dict[str, etree._Element] = {}
+        for win in list(windows):
+            name = win.get("name")
+            if name in seen:
+                # Remove the earlier duplicate, keep the newer one
+                windows.remove(seen[name])
+            seen[name] = win
 
     def _find_worksheet(self, name: str) -> etree._Element:
         """Find a worksheet element by name."""
@@ -684,6 +710,7 @@ class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin,
         Raises:
             TWBValidationError: If validate=True and the TWB structure is broken.
         """
+        self._deduplicate_windows()
         self._sanitize_workbook_tree()
 
         if validate:

@@ -136,6 +136,29 @@ class BaseChartBuilder:
                     instances[expr] = dataclass_replace(ci, ci_type="quantitative", instance_name=new_inst_name)
         return instances
 
+    @staticmethod
+    def _reorder_view_children(view: etree._Element) -> None:
+        """Re-sort ``<view>`` children to match the Tableau XSD sequence.
+
+        XSD content model for ``<view>`` (ViewSpecification):
+            datasources?, mapsources?, datasource-dependencies*,
+            filter*, sort*, perspectives*, shelf-sorts*, slices?, aggregation
+
+        Calling this after all mutations guarantees valid ordering regardless
+        of the insertion sequence used by individual helpers.
+        """
+        _VIEW_ORDER = (
+            "datasources", "mapsources", "datasource-dependencies",
+            "filter", "sort", "perspectives", "shelf-sorts", "slices",
+            "aggregation",
+        )
+        tag_rank = {t: i for i, t in enumerate(_VIEW_ORDER)}
+        children = list(view)
+        # Stable sort: elements not in the map keep their relative order at the end
+        children.sort(key=lambda el: tag_rank.get(el.tag, len(_VIEW_ORDER)))
+        for child in children:
+            view.append(child)  # lxml moves (not copies) existing elements
+
     def _setup_datasource_dependencies(self, view: etree._Element, ds_name: str, instances: dict[str, ColumnInstance], all_exprs: list[str]) -> None:
         """Rewrite <datasource-dependencies> to include required columns and instances."""
         for old_dep in view.findall("datasource-dependencies"):

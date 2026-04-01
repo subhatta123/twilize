@@ -105,13 +105,16 @@ class DashboardsMixin:
         db = etree.SubElement(dashboards, "dashboard")
         db.set("name", dashboard_name)
 
-        # Dashboard style — set background color for card-based design
+        # Dashboard style — set background color from rules or default
+        bg_color = "#dce8f0"
+        if isinstance(layout, dict) and layout.get("_background_color"):
+            bg_color = layout["_background_color"]
         db_style = etree.SubElement(db, "style")
         style_rule = etree.SubElement(db_style, "style-rule")
         style_rule.set("element", "table")
         fmt = etree.SubElement(style_rule, "format")
         fmt.set("attr", "background-color")
-        fmt.set("value", "#dce8f0")
+        fmt.set("value", bg_color)
 
         size_el = etree.SubElement(db, "size")
         size_el.set("maxheight", str(height))
@@ -137,6 +140,7 @@ class DashboardsMixin:
                 filter_worksheet=layout.get("_filter_worksheet", ""),
                 field_registry=self.field_registry,
                 editor=self,
+                rules=layout.get("_rules"),
             )
             # Build deps from all worksheet names (including filter metadata)
             all_ws = layout.get("_kpi_names", []) + layout.get("_chart_names", [])
@@ -146,6 +150,10 @@ class DashboardsMixin:
                 filters=layout.get("_filters"),
                 filter_worksheet=layout.get("_filter_worksheet", ""),
             )
+            # Set "Entire View" fit mode for ALL worksheets (KPIs + charts)
+            # so they scale to fill their zone (not clipped or scrolled).
+            for ws_name in layout.get("_kpi_names", []) + layout.get("_chart_names", []):
+                worksheet_options[ws_name] = {"fit": "entire"}
         elif worksheet_names or isinstance(layout, dict) or isinstance(layout, str):
             layout_dict = resolve_dashboard_layout(layout, worksheet_names)
             validate_layout_worksheets(layout_dict)

@@ -26,12 +26,24 @@ from __future__ import annotations
 
 from typing import Optional, Union
 
+from .builder_base import BaseChartBuilder
 from .builder_basic import BasicChartBuilder
 from .builder_dual_axis import DualAxisChartBuilder
 from .builder_maps import MapChartBuilder
 from .builder_pie import PieChartBuilder
 from .builder_text import TextChartBuilder
 from .routing_policy import ChartRouteProfile, profile_chart_request, profile_dual_axis_request
+
+
+def _build_and_reorder(builder: BaseChartBuilder, editor) -> str:
+    """Run builder.build(), then fix <view> child ordering to satisfy XSD."""
+    result = builder.build()
+    # Reorder view children in the worksheet that was just built
+    ws = editor._find_worksheet(builder.worksheet_name)
+    view = ws.find(".//table/view")
+    if view is not None:
+        BaseChartBuilder._reorder_view_children(view)
+    return result
 
 
 def decide_chart_builder(mark_type: str, *, measure_values: Optional[list[str]] = None) -> ChartRouteProfile:
@@ -81,7 +93,7 @@ def configure_chart(
         builder = PieChartBuilder(
             editor, worksheet_name, color, wedge_size, label, detail, tooltip, filters
         )
-        return builder.build()
+        return _build_and_reorder(builder, editor)
 
     if decision.builder_name == "map":
         builder = MapChartBuilder(
@@ -97,7 +109,7 @@ def configure_chart(
             filters,
             map_layers=map_layers,
         )
-        return builder.build()
+        return _build_and_reorder(builder, editor)
 
     if decision.builder_name == "text":
         builder = TextChartBuilder(
@@ -117,7 +129,7 @@ def configure_chart(
             label_param=label_param,
             text_format=text_format,
         )
-        return builder.build()
+        return _build_and_reorder(builder, editor)
 
     builder = BasicChartBuilder(
         editor,
@@ -140,7 +152,7 @@ def configure_chart(
         label_extra=label_extra,
         label_runs=label_runs,
     )
-    return builder.build()
+    return _build_and_reorder(builder, editor)
 
 
 def configure_dual_axis(
@@ -212,4 +224,4 @@ def configure_dual_axis(
         extra_axes=extra_axes,
         color_map_1=color_map_1,
     )
-    return builder.build()
+    return _build_and_reorder(builder, editor)

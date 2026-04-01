@@ -219,16 +219,25 @@ def validate_suggestion(
     suggestion: DashboardSuggestion,
     classified: ClassifiedSchema,
     max_charts: int = 5,
+    rules: dict | None = None,
 ) -> DashboardSuggestion:
     """Validate and clean up a dashboard suggestion.
 
     1. Remove Map charts when no geographic fields exist **or** when
-       geographic data quality is poor (>20% null/unknown values).
+       geographic data quality is poor (>threshold null/unknown values).
        Replaced maps get a Bar-chart alternative.
     2. Deduplicate charts (same type + same fields).
     3. Enforce max_charts limit.
     """
     charts = list(suggestion.charts)
+
+    # Resolve map null thresholds from rules
+    from twilize.dashboard_rules import (
+        map_latlong_null_threshold as _latlong_thresh,
+        map_null_threshold as _name_thresh,
+    )
+    latlong_threshold = _latlong_thresh(rules) if rules else 0.20
+    name_threshold = _name_thresh(rules) if rules else 0.10
 
     # --- Remove invalid or low-quality maps ---
     has_geo = bool(classified.geographic)
@@ -248,7 +257,7 @@ def validate_suggestion(
         if total > 0:
             null_ratio = geo_col.spec.null_count / total
             # Stricter threshold for non-lat/long fields (geocoded names)
-            threshold = 0.20 if is_latlong else 0.10
+            threshold = latlong_threshold if is_latlong else name_threshold
             geo_quality_ok = null_ratio < threshold
             if not geo_quality_ok:
                 removal_reason = (
@@ -277,8 +286,8 @@ def validate_suggestion(
                     charts.append(replacement)
         charts = [c for c in charts if c.chart_type != "Map"]
 
-    # Deduplicate
-    charts = deduplicate_charts(charts, max_per_type=2)
+    # Deduplicate — one chart per non-KPI type for dashboard variety
+    charts = deduplicate_charts(charts, max_per_type=1)
 
     # Enforce max
     charts = charts[:max_charts]

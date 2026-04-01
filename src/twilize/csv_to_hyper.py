@@ -11,6 +11,7 @@ from __future__ import annotations
 import csv
 import logging
 import re
+import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -392,7 +393,16 @@ def csv_to_hyper(
 
     hyper_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with HyperProcess(telemetry=Telemetry.DO_NOT_SEND_USAGE_DATA_TO_TABLEAU) as hyper:
+    # Use a dedicated temp dir for Hyper logs.  On some Windows configurations
+    # (e.g. MCP servers launched by Claude Desktop) tempfile.gettempdir()
+    # resolves to C:\WINDOWS\system32 which is not writable, causing hyperd
+    # to crash on startup.  mkdtemp always returns a writable directory.
+    hyper_log_dir = tempfile.mkdtemp(prefix="twilize_hyper_logs_")
+
+    with HyperProcess(
+        telemetry=Telemetry.DO_NOT_SEND_USAGE_DATA_TO_TABLEAU,
+        parameters={"log_dir": hyper_log_dir},
+    ) as hyper:
         with Connection(
             endpoint=hyper.endpoint,
             database=str(hyper_path),

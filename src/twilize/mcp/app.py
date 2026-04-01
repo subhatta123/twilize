@@ -12,11 +12,15 @@ The `instructions` string is what AI agents read when they first connect —
 it summarises the required call order and points agents to skill resources.
 """
 
+import functools
+import logging
 from typing import Any
 
 from pydantic import create_model
 from mcp.server.fastmcp.utilities import func_metadata as _fm
 from mcp.server.fastmcp import FastMCP
+
+_log = logging.getLogger(__name__)
 
 # Monkey-patch: MCP SDK 1.26.0 calls create_model(name, result=type) which
 # Pydantic v2 rejects — it needs create_model(name, result=(type, ...)).
@@ -31,7 +35,25 @@ def _patched_create_wrapped(func_name: str, annotation: Any) -> type:
 _fm._create_wrapped_model = _patched_create_wrapped
 
 
-server = FastMCP(
+class _SafeFastMCP(FastMCP):
+    """FastMCP subclass that wraps every tool function with error handling."""
+
+    def tool(self, *args, **kwargs):
+        decorator = super().tool(*args, **kwargs)
+
+        def wrapping_decorator(func):
+            @functools.wraps(func)
+            def safe_wrapper(*a, **kw):
+                try:
+                    return func(*a, **kw)
+                except Exception as exc:
+                    _log.error("Tool %s failed: %s", func.__name__, exc, exc_info=True)
+                    return f"Error in {func.__name__}: {exc}"
+            return decorator(safe_wrapper)
+        return wrapping_decorator
+
+
+server = _SafeFastMCP(
     "twilize",
     instructions=(
         "Tableau Workbook (.twb/.twbx) generation MCP Server.\n\n"
@@ -56,8 +78,12 @@ server = FastMCP(
         "  - profile_csv() — profile a CSV before connecting\n"
         "  - recommend_template() — pick the best layout template\n"
         "  - list_gallery_templates() — see all available templates\n\n"
-        "For CSV data: use csv_to_dashboard() for an end-to-end pipeline, "
-        "or csv_to_hyper() + set_hyper_connection() for manual control.\n\n"
+        "For end-to-end dashboards from data:\n"
+        "  - CSV:   csv_to_dashboard()\n"
+        "  - Hyper: hyper_to_dashboard()\n"
+        "  - MySQL: mysql_to_dashboard()\n"
+        "  - MSSQL: mssql_to_dashboard()\n"
+        "Or use csv_to_hyper() + set_hyper_connection() for manual control.\n\n"
         "Use list_capabilities or describe_capability to check whether a "
         "chart type or feature is supported before attempting it."
     ),

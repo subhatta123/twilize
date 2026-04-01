@@ -38,7 +38,10 @@ def inspect_hyper_schema(filepath: str) -> dict:
         shutil.copy2(filepath, tmp_path)
 
         tables_out: list[dict] = []
-        with HyperProcess(telemetry=Telemetry.DO_NOT_SEND_USAGE_DATA_TO_TABLEAU) as hyper:
+        with HyperProcess(
+            telemetry=Telemetry.DO_NOT_SEND_USAGE_DATA_TO_TABLEAU,
+            parameters={"log_dir": tempfile.gettempdir()},
+        ) as hyper:
             with Connection(
                 endpoint=hyper.endpoint,
                 database=tmp_path,
@@ -529,4 +532,104 @@ class ConnectionsMixin:
 
                     local_type_el = etree.SubElement(mr, "local-type")
                     local_type_el.text = datatype
+
+    def set_mssql_connection(
+        self,
+        server: str,
+        dbname: str,
+        username: str,
+        table_name: str,
+        port: str = "1433",
+    ) -> str:
+        """Configure the datasource to use a Microsoft SQL Server connection.
+
+        Creates a ``<connection class='federated'>`` with a
+        ``<connection class='sqlserver'>`` named-connection, mirroring
+        the MySQL connection pattern.
+
+        Args:
+            server: MSSQL server hostname or IP.
+            dbname: Database name.
+            username: Database username.
+            table_name: Table name to connect to.
+            port: Server port (default 1433).
+
+        Returns:
+            Confirmation message.
+        """
+        # 1. Update <connection class='federated'>
+        fed_conn = self._datasource.find("connection[@class='federated']")
+        if fed_conn is None:
+            for old_conn in self._datasource.findall("connection"):
+                self._datasource.remove(old_conn)
+            fed_conn = etree.Element("connection")
+            fed_conn.set("class", "federated")
+            self._datasource.insert(0, fed_conn)
+
+        # Update <named-connections>
+        named_conns = fed_conn.find("named-connections")
+        if named_conns is None:
+            named_conns = etree.SubElement(fed_conn, "named-connections")
+        else:
+            for child in list(named_conns):
+                named_conns.remove(child)
+
+        conn_name = f"sqlserver.{_generate_uuid().strip('{}').lower()}"
+
+        nc = etree.SubElement(named_conns, "named-connection")
+        nc.set("caption", server)
+        nc.set("name", conn_name)
+
+        mssql_conn = etree.SubElement(nc, "connection")
+        mssql_conn.set("class", "sqlserver")
+        mssql_conn.set("dbname", dbname)
+        mssql_conn.set("odbc-native-protocol", "yes")
+        mssql_conn.set("one-time-sql", "")
+        mssql_conn.set("port", str(port))
+        mssql_conn.set("server", server)
+        mssql_conn.set("username", username)
+
+        # 2. Update <relation>
+        relation = fed_conn.find("relation")
+        if relation is None:
+            relation = etree.SubElement(fed_conn, "relation")
+
+        relation.set("connection", conn_name)
+        relation.set("name", table_name)
+        relation.set("table", f"[dbo].[{table_name}]")
+        relation.set("type", "table")
+        for cols in relation.findall("columns"):
+            relation.remove(cols)
+
+        # 3. Update <object-graph> relation
+        for og_rel in self._datasource.findall(".//object-graph//relation"):
+            og_rel.set("connection", conn_name)
+            og_rel.set("name", table_name)
+            og_rel.set("table", f"[dbo].[{table_name}]")
+            og_rel.set("type", "table")
+            for cols in og_rel.findall("columns"):
+                og_rel.remove(cols)
+
+        # 4. Cleanup old connections and leftover fields
+        excel_conn = self._datasource.find("connection[@class='excel-direct']")
+        if excel_conn is not None:
+            self._datasource.remove(excel_conn)
+
+        old_cols = fed_conn.find("cols")
+        if old_cols is not None:
+            fed_conn.remove(old_cols)
+
+        for c in self._datasource.findall("column"):
+            self._datasource.remove(c)
+
+        aliases = self._datasource.find("aliases")
+        if aliases is not None:
+            self._datasource.remove(aliases)
+
+        # 5. Clean metadata-records
+        for mr in self._datasource.findall(".//metadata-record"):
+            mr.getparent().remove(mr)
+
+        self._reinit_fields()
+        return f"Configured MSSQL connection to {server}/{dbname} (table: {table_name})"
 

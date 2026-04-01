@@ -79,6 +79,10 @@ def generate_workbook(
 
     logger.info("Wrote %d rows to %s", len(data_rows), csv_path)
 
+    # Load YAML dashboard rules (user overrides + built-in defaults)
+    from twilize.dashboard_rules import load_rules as _load_rules
+    _rules = _load_rules(csv_path)
+
     # Step 2: Build schema from Tableau's type metadata (NOT re-inferred from CSV)
     # This preserves the accurate types Tableau already knows about
     row_count = len(data_rows)
@@ -133,11 +137,11 @@ def generate_workbook(
         if col_el.get("default-format"):
             continue  # already formatted
         if _is_rate_field(bare_name):
-            col_el.set("default-format", "0.00%")
+            col_el.set("default-format", "0%")
         elif _is_currency_field(bare_name):
-            col_el.set("default-format", '$#,##0.0,,,"B"')
+            col_el.set("default-format", "#,##0")
         elif _is_population_field(bare_name):
-            col_el.set("default-format", '#,##0.0,,,"B"')
+            col_el.set("default-format", "#,##0")
         elif col_el.get("datatype") in ("real", "integer"):
             # Generic large-number formatting — forces international locale
             col_el.set("default-format", "#,##0")
@@ -161,7 +165,8 @@ def generate_workbook(
     suggestion = dict_to_suggestion(plan)
 
     # Validate suggestion (remove invalid maps, dedup, enforce max)
-    suggestion = validate_suggestion(suggestion, classified, max_charts=8)
+    from twilize.dashboard_rules import max_charts as _rules_max_charts
+    suggestion = validate_suggestion(suggestion, classified, max_charts=_rules_max_charts(_rules), rules=_rules)
 
     # Build field lookups needed by post-processing and chart configuration
     known_fields = {f.name for f in fields}
@@ -178,13 +183,15 @@ def generate_workbook(
     # diversity swaps, fallbacks) regardless of where the chart was created.
     _dim_cardinality = {d.spec.name: d.spec.cardinality for d in classified.dimensions}
     from twilize.chart_suggester import _is_rate_field, _is_currency_field, _is_population_field, smart_aggregation
+    from twilize.dashboard_rules import bar_top_n as _rules_bar_top_n
+    _top_n = _rules_bar_top_n(_rules)
     for chart in suggestion.charts:
         # Auto-apply Top N to Bar charts with high-cardinality dimensions
         if chart.chart_type == "Bar" and not chart.top_n:
             for shelf in chart.shelves:
                 if shelf.shelf in ("rows", "columns") and not shelf.aggregation:
                     card = _dim_cardinality.get(shelf.field_name, 0)
-                    if card > 10:
+                    if card > _top_n:
                         # Find the measure to rank by
                         measure_shelf = next(
                             (s for s in chart.shelves if s.aggregation), None
@@ -192,11 +199,11 @@ def generate_workbook(
                         if measure_shelf:
                             chart.top_n = {
                                 "field": shelf.field_name,
-                                "n": 10,
+                                "n": _top_n,
                                 "by": f"{measure_shelf.aggregation}({measure_shelf.field_name})",
                             }
                             chart.sort_descending = chart.sort_descending or measure_shelf.field_name
-                            print(f"[PIPELINE] Auto-applied Top 10 on '{shelf.field_name}' by '{chart.top_n['by']}'")
+                            print(f"[PIPELINE] Auto-applied Top {_top_n} on '{shelf.field_name}' by '{chart.top_n['by']}'")
                         break
 
         # Validate aggregations: prevent AVG/SUM on non-numeric fields
@@ -209,24 +216,22 @@ def generate_workbook(
                     print(f"[PIPELINE] WARNING: {shelf.aggregation}({bare_field}) on non-numeric field, switching to COUNT")
                     shelf.aggregation = "COUNT"
 
-        # Auto-apply number formatting to KPI text charts
+        # Auto-apply number formatting to KPI text charts using YAML rules
         if chart.chart_type == "Text" and not chart.text_format:
+            from twilize.dashboard_rules import kpi_number_format
             auto_fmt: dict[str, str] = {}
             for shelf in chart.shelves:
                 bare = shelf.field_name
                 if "(" in bare and ")" in bare:
                     bare = bare.split("(", 1)[1].rsplit(")", 1)[0]
-                if _is_rate_field(bare):
-                    auto_fmt[shelf.field_name] = "0.00%"
-                elif _is_currency_field(bare):
-                    auto_fmt[shelf.field_name] = '$#,##0.0,,,"B"'
-                elif _is_population_field(bare):
-                    auto_fmt[shelf.field_name] = '#,##0.0,,,"B"'
+                agg = shelf.aggregation or smart_aggregation(bare)
+                auto_fmt[shelf.field_name] = kpi_number_format(bare, agg, _rules)
             if auto_fmt:
                 chart.text_format = auto_fmt
 
     # Select auto-filters for interactivity
-    auto_filters = select_auto_filters(classified, max_filters=5)
+    from twilize.dashboard_rules import max_filters as _rules_max_filters
+    auto_filters = select_auto_filters(classified, max_filters=_rules_max_filters(_rules))
     # Resolve filter field names to actual datasource fields (e.g. "Year" -> "YEAR(Year)")
     # and remove filters whose fields can't be resolved to a known field
     _resolved_filters: list[dict] = []
@@ -275,11 +280,12 @@ def generate_workbook(
                 print(f"[PIPELINE] WARNING: Field '{shelf.field_name}' not in known_fields")
 
     worksheet_names = []
+    used_names: set[str] = set()
     configured_ok: set[str] = set()
     failed_indices: list[int] = []
 
     for i, chart in enumerate(suggestion.charts):
-        ws_name = _safe_worksheet_name(chart.title, i)
+        ws_name = _safe_worksheet_name(chart.title, i, used_names)
         worksheet_names.append(ws_name)
 
         logger.info("Creating worksheet: %s (%s)", ws_name, chart.chart_type)
@@ -475,6 +481,13 @@ def generate_workbook(
     logger.info("Creating dashboard: %s with %d worksheets", title, len(worksheet_names))
     layout = _build_layout(suggestion, worksheet_names, title=title, filters=auto_filters)
 
+    # Inject YAML dashboard rules into C3 layout for KPI formatting/sizing
+    from twilize.dashboard_rules import dashboard_background
+    if isinstance(layout, dict) and layout.get("_c3_template"):
+        layout["_rules"] = _rules
+    if isinstance(layout, dict):
+        layout["_background_color"] = dashboard_background(_rules)
+
     # Ensure the filter worksheet was successfully configured; fall back to
     # the first worksheet that actually has filters/shelves set up.
     if isinstance(layout, dict) and layout.get("_c3_template"):
@@ -529,7 +542,8 @@ def generate_workbook(
     # Step 7c: Apply theme — skip for C3 template (it has its own styling)
     is_c3 = isinstance(layout, dict) and layout.get("_c3_template")
     if not is_c3:
-        theme_name = plan.get("theme", "modern-light")
+        from twilize.dashboard_rules import theme_name as _rules_theme
+        theme_name = plan.get("theme", _rules_theme(_rules))
         theme_colors = plan.get("theme_colors")
         try:
             from twilize.style_presets import apply_theme_to_editor

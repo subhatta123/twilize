@@ -272,18 +272,274 @@ _C2_TEMPLATE_XML = """\
 </zones>
 """
 
+# ── C4 template — Logo + Title, 4 KPIs, 1 full-width + 2 half-width sheets ──
+# Layout from Image 3: professional template with logo placeholder.
+# Structure: Logo|Title → Filters → 4 KPIs → 1 full-width chart → 2 side-by-side charts
+_C4_TEMPLATE_XML = """\
+<zones>
+  <zone h="100000" id="1" param="vert" type-v2="layout-flow" w="100000" x="0" y="0">
+    <zone fixed-size="70" h="8750" id="2" is-fixed="true" param="horz" type-v2="layout-flow" w="100000" x="0" y="0">
+      <zone forceUpdate="true" h="8750" id="6" type-v2="text" w="15000" x="0" y="0">
+        <formatted-text><run bold="true" fontalignment="1" fontcolor="#111e29" fontsize="12">LOGO PLACEHOLDER</run></formatted-text>
+        <zone-style>
+          <format attr="border-color" value="#d0d0d0"/><format attr="border-style" value="solid"/><format attr="border-width" value="1"/>
+          <format attr="margin" value="4"/><format attr="margin-left" value="8"/>
+          <format attr="background-color" value="#ffffff"/>
+        </zone-style>
+      </zone>
+      <zone forceUpdate="true" h="8750" id="5" type-v2="text" w="83666" x="15000" y="0">
+        <formatted-text>
+          <run bold="true" fontalignment="1" fontcolor="#111e29" fontsize="20">TITLE PLACEHOLDER</run>
+        </formatted-text>
+        <zone-style>
+          <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+          <format attr="margin" value="4"/>
+        </zone-style>
+      </zone>
+      <zone-style>
+        <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+        <format attr="margin-right" value="8"/><format attr="margin-left" value="8"/>
+        <format attr="background-color" value="#ffffff"/>
+      </zone-style>
+    </zone>
+    <zone fixed-size="30" h="3750" id="3" is-fixed="true" param="horz" type-v2="layout-flow" w="100000" x="0" y="8750">
+      <zone forceUpdate="true" h="3750" id="8" type-v2="text" w="98666" x="667" y="8750">
+        <formatted-text>
+          <run bold="true" fontalignment="1" fontcolor="#ffffff" fontsize="12">FILTERS PLACEHOLDER</run>
+        </formatted-text>
+        <zone-style>
+          <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+          <format attr="margin" value="4"/>
+        </zone-style>
+      </zone>
+      <zone-style>
+        <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+        <format attr="margin-right" value="8"/><format attr="margin-left" value="8"/>
+        <format attr="background-color" value="#192f3e"/>
+      </zone-style>
+    </zone>
+    <zone fixed-size="100" h="12500" id="16" is-fixed="true" layout-strategy-id="distribute-evenly" param="horz" type-v2="layout-flow" w="100000" x="0" y="12500">
+      <zone forceUpdate="true" h="12500" id="17" type-v2="text" w="25000" x="0" y="12500">
+        <formatted-text><run bold="true" fontalignment="1" fontcolor="#111e29" fontsize="15">KPI_SLOT_1</run></formatted-text>
+        <zone-style>
+          <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+          <format attr="margin" value="0"/><format attr="margin-right" value="4"/><format attr="margin-bottom" value="4"/><format attr="margin-left" value="8"/>
+          <format attr="background-color" value="#ffffff"/>
+        </zone-style>
+      </zone>
+      <zone forceUpdate="true" h="12500" id="20" type-v2="text" w="25000" x="25000" y="12500">
+        <formatted-text><run bold="true" fontalignment="1" fontcolor="#111e29" fontsize="15">KPI_SLOT_2</run></formatted-text>
+        <zone-style>
+          <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+          <format attr="margin" value="0"/><format attr="margin-right" value="4"/><format attr="margin-bottom" value="4"/><format attr="margin-left" value="4"/>
+          <format attr="background-color" value="#ffffff"/>
+        </zone-style>
+      </zone>
+      <zone forceUpdate="true" h="12500" id="19" type-v2="text" w="25000" x="50000" y="12500">
+        <formatted-text><run bold="true" fontalignment="1" fontcolor="#111e29" fontsize="15">KPI_SLOT_3</run></formatted-text>
+        <zone-style>
+          <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+          <format attr="margin" value="0"/><format attr="margin-right" value="4"/><format attr="margin-bottom" value="4"/><format attr="margin-left" value="4"/>
+          <format attr="background-color" value="#ffffff"/>
+        </zone-style>
+      </zone>
+      <zone forceUpdate="true" h="12500" id="18" type-v2="text" w="25000" x="75000" y="12500">
+        <formatted-text><run bold="true" fontalignment="1" fontcolor="#111e29" fontsize="15">KPI_SLOT_4</run></formatted-text>
+        <zone-style>
+          <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+          <format attr="margin" value="0"/><format attr="margin-right" value="8"/><format attr="margin-bottom" value="4"/><format attr="margin-left" value="4"/>
+          <format attr="background-color" value="#ffffff"/>
+        </zone-style>
+      </zone>
+      <zone-style>
+        <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+        <format attr="margin" value="0"/><format attr="margin-top" value="0"/>
+      </zone-style>
+    </zone>
+    <zone h="37500" id="22" param="horz" type-v2="layout-flow" w="100000" x="0" y="25000">
+      <zone forceUpdate="true" h="37500" id="23" type-v2="text" w="100000" x="0" y="25000">
+        <formatted-text><run bold="true" fontalignment="1" fontcolor="#111e29" fontsize="15">SHEET_SLOT_1</run></formatted-text>
+        <zone-style>
+          <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+          <format attr="margin" value="4"/><format attr="margin-left" value="8"/><format attr="margin-right" value="8"/>
+          <format attr="background-color" value="#ffffff"/>
+        </zone-style>
+      </zone>
+    </zone>
+    <zone h="37500" id="9" layout-strategy-id="distribute-evenly" param="horz" type-v2="layout-flow" w="100000" x="0" y="62500">
+      <zone forceUpdate="true" h="37500" id="12" type-v2="text" w="50000" x="0" y="62500">
+        <formatted-text><run bold="true" fontalignment="1" fontcolor="#111e29" fontsize="15">SHEET_SLOT_2</run></formatted-text>
+        <zone-style>
+          <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+          <format attr="margin" value="4"/><format attr="margin-left" value="8"/><format attr="margin-bottom" value="8"/>
+          <format attr="background-color" value="#ffffff"/>
+        </zone-style>
+      </zone>
+      <zone forceUpdate="true" h="37500" id="14" type-v2="text" w="50000" x="50000" y="62500">
+        <formatted-text><run bold="true" fontalignment="1" fontcolor="#111e29" fontsize="15">SHEET_SLOT_3</run></formatted-text>
+        <zone-style>
+          <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+          <format attr="margin" value="4"/><format attr="margin-right" value="8"/><format attr="margin-bottom" value="8"/>
+          <format attr="background-color" value="#ffffff"/>
+        </zone-style>
+      </zone>
+    </zone>
+  </zone>
+</zones>
+"""
+
+# ── C5 template — Logo + Title, 5 KPIs, 2 left-stacked + 1 right-spanning ──
+# Layout from Image 4: professional template with logo placeholder and 5 KPIs.
+# Structure: Logo|Title → Filters → 5 KPIs → [Sheet1(left-top) | Sheet3(right-full)] → [Sheet2(left-bottom) | Sheet3 continues]
+_C5_TEMPLATE_XML = """\
+<zones>
+  <zone h="100000" id="1" param="vert" type-v2="layout-flow" w="100000" x="0" y="0">
+    <zone fixed-size="70" h="8750" id="2" is-fixed="true" param="horz" type-v2="layout-flow" w="100000" x="0" y="0">
+      <zone forceUpdate="true" h="8750" id="6" type-v2="text" w="15000" x="0" y="0">
+        <formatted-text><run bold="true" fontalignment="1" fontcolor="#111e29" fontsize="12">LOGO PLACEHOLDER</run></formatted-text>
+        <zone-style>
+          <format attr="border-color" value="#d0d0d0"/><format attr="border-style" value="solid"/><format attr="border-width" value="1"/>
+          <format attr="margin" value="4"/><format attr="margin-left" value="8"/>
+          <format attr="background-color" value="#ffffff"/>
+        </zone-style>
+      </zone>
+      <zone forceUpdate="true" h="8750" id="5" type-v2="text" w="83666" x="15000" y="0">
+        <formatted-text>
+          <run bold="true" fontalignment="1" fontcolor="#111e29" fontsize="20">TITLE PLACEHOLDER</run>
+        </formatted-text>
+        <zone-style>
+          <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+          <format attr="margin" value="4"/>
+        </zone-style>
+      </zone>
+      <zone-style>
+        <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+        <format attr="margin-right" value="8"/><format attr="margin-left" value="8"/>
+        <format attr="background-color" value="#ffffff"/>
+      </zone-style>
+    </zone>
+    <zone fixed-size="30" h="3750" id="3" is-fixed="true" param="horz" type-v2="layout-flow" w="100000" x="0" y="8750">
+      <zone forceUpdate="true" h="3750" id="8" type-v2="text" w="98666" x="667" y="8750">
+        <formatted-text>
+          <run bold="true" fontalignment="1" fontcolor="#ffffff" fontsize="12">FILTERS PLACEHOLDER</run>
+        </formatted-text>
+        <zone-style>
+          <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+          <format attr="margin" value="4"/>
+        </zone-style>
+      </zone>
+      <zone-style>
+        <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+        <format attr="margin-right" value="8"/><format attr="margin-left" value="8"/>
+        <format attr="background-color" value="#192f3e"/>
+      </zone-style>
+    </zone>
+    <zone fixed-size="100" h="12500" id="16" is-fixed="true" layout-strategy-id="distribute-evenly" param="horz" type-v2="layout-flow" w="100000" x="0" y="12500">
+      <zone forceUpdate="true" h="12500" id="17" type-v2="text" w="20000" x="0" y="12500">
+        <formatted-text><run bold="true" fontalignment="1" fontcolor="#111e29" fontsize="15">KPI_SLOT_1</run></formatted-text>
+        <zone-style>
+          <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+          <format attr="margin" value="0"/><format attr="margin-right" value="4"/><format attr="margin-bottom" value="4"/><format attr="margin-left" value="8"/>
+          <format attr="background-color" value="#ffffff"/>
+        </zone-style>
+      </zone>
+      <zone forceUpdate="true" h="12500" id="20" type-v2="text" w="20000" x="20000" y="12500">
+        <formatted-text><run bold="true" fontalignment="1" fontcolor="#111e29" fontsize="15">KPI_SLOT_2</run></formatted-text>
+        <zone-style>
+          <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+          <format attr="margin" value="0"/><format attr="margin-right" value="4"/><format attr="margin-bottom" value="4"/><format attr="margin-left" value="4"/>
+          <format attr="background-color" value="#ffffff"/>
+        </zone-style>
+      </zone>
+      <zone forceUpdate="true" h="12500" id="21" type-v2="text" w="20000" x="40000" y="12500">
+        <formatted-text><run bold="true" fontalignment="1" fontcolor="#111e29" fontsize="15">KPI_SLOT_3</run></formatted-text>
+        <zone-style>
+          <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+          <format attr="margin" value="4"/><format attr="margin-top" value="0"/>
+          <format attr="background-color" value="#ffffff"/>
+        </zone-style>
+      </zone>
+      <zone forceUpdate="true" h="12500" id="19" type-v2="text" w="20000" x="60000" y="12500">
+        <formatted-text><run bold="true" fontalignment="1" fontcolor="#111e29" fontsize="15">KPI_SLOT_4</run></formatted-text>
+        <zone-style>
+          <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+          <format attr="margin" value="0"/><format attr="margin-right" value="4"/><format attr="margin-bottom" value="4"/><format attr="margin-left" value="4"/>
+          <format attr="background-color" value="#ffffff"/>
+        </zone-style>
+      </zone>
+      <zone forceUpdate="true" h="12500" id="18" type-v2="text" w="20000" x="80000" y="12500">
+        <formatted-text><run bold="true" fontalignment="1" fontcolor="#111e29" fontsize="15">KPI_SLOT_5</run></formatted-text>
+        <zone-style>
+          <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+          <format attr="margin" value="0"/><format attr="margin-right" value="8"/><format attr="margin-bottom" value="4"/><format attr="margin-left" value="4"/>
+          <format attr="background-color" value="#ffffff"/>
+        </zone-style>
+      </zone>
+      <zone-style>
+        <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+        <format attr="margin" value="0"/><format attr="margin-top" value="0"/>
+      </zone-style>
+    </zone>
+    <zone fixed-size="1100" h="75000" id="9" is-fixed="true" param="horz" type-v2="layout-flow" w="100000" x="0" y="25000">
+      <zone h="75000" id="10" layout-strategy-id="distribute-evenly" param="vert" type-v2="layout-flow" w="45000" x="0" y="25000">
+        <zone forceUpdate="true" h="37500" id="12" type-v2="text" w="45000" x="0" y="25000">
+          <formatted-text><run bold="true" fontalignment="1" fontcolor="#111e29" fontsize="15">SHEET_SLOT_1</run></formatted-text>
+          <zone-style>
+            <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+            <format attr="margin" value="4"/><format attr="margin-left" value="8"/>
+            <format attr="background-color" value="#ffffff"/>
+          </zone-style>
+        </zone>
+        <zone forceUpdate="true" h="37500" id="13" type-v2="text" w="45000" x="0" y="62500">
+          <formatted-text><run bold="true" fontalignment="1" fontcolor="#111e29" fontsize="15">SHEET_SLOT_2</run></formatted-text>
+          <zone-style>
+            <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+            <format attr="margin" value="4"/><format attr="margin-bottom" value="8"/><format attr="margin-left" value="8"/>
+            <format attr="background-color" value="#ffffff"/>
+          </zone-style>
+        </zone>
+      </zone>
+      <zone forceUpdate="true" h="75000" id="14" type-v2="text" w="55000" x="45000" y="25000">
+        <formatted-text><run bold="true" fontalignment="1" fontcolor="#111e29" fontsize="15">SHEET_SLOT_3</run></formatted-text>
+        <zone-style>
+          <format attr="border-color" value="#000000"/><format attr="border-style" value="none"/><format attr="border-width" value="0"/>
+          <format attr="margin" value="4"/><format attr="margin-right" value="8"/><format attr="margin-bottom" value="8"/>
+          <format attr="background-color" value="#ffffff"/>
+        </zone-style>
+      </zone>
+    </zone>
+  </zone>
+</zones>
+"""
+
 # Slot names in template order
 _KPI_SLOTS = ["KPI_SLOT_1", "KPI_SLOT_2", "KPI_SLOT_3", "KPI_SLOT_4", "KPI_SLOT_5"]
 _SHEET_SLOTS = ["SHEET_SLOT_1", "SHEET_SLOT_2", "SHEET_SLOT_3", "SHEET_SLOT_4"]
+
+# Maximum sheet slots per template (for multi-dashboard splitting)
+TEMPLATE_SHEET_CAPACITY = {
+    "c2": 4,
+    "c3": 4,
+    "c4": 3,
+    "c5": 3,
+}
 
 
 def _select_template_xml(n_kpis: int, n_charts: int) -> str:
     """Auto-select the best template based on dashboard content.
 
-    - C2 (4 KPI slots): when ≤4 KPIs — gives each KPI 25% width
-    - C3 (5 KPI slots): when 5 KPIs — gives each KPI 20% width
-    Both templates share the same 2x2 chart grid and styling.
+    Template selection rules:
+    - C4 (logo, 4 KPI slots, 3 sheet slots): ≤4 KPIs AND ≤3 charts
+    - C5 (logo, 5 KPI slots, 3 sheet slots): 5 KPIs AND ≤3 charts
+    - C2 (4 KPI slots, 4 sheet slots): ≤4 KPIs AND >3 charts (fallback)
+    - C3 (5 KPI slots, 4 sheet slots): 5 KPIs AND >3 charts (fallback)
     """
+    if n_charts <= 3:
+        # Use logo templates when fewer charts (more polished look)
+        if n_kpis <= 4:
+            return _C4_TEMPLATE_XML
+        return _C5_TEMPLATE_XML
+    # More charts → use 4-slot templates without logo
     if n_kpis <= 4:
         return _C2_TEMPLATE_XML
     return _C3_TEMPLATE_XML
@@ -400,7 +656,7 @@ def _swap_text_to_filter(
         fz.set("id", str(id_fn()))
         fz.set("type-v2", "filter")
         fz.set("name", filter_worksheet)
-        fz.set("mode", "multiplevalues")
+        fz.set("mode", "dropdown")
         fz.set("show-title", "true")
         fz.set("x", str(667 + fi * fw))
         fz.set("y", str(base_y))
@@ -424,6 +680,43 @@ def _swap_text_to_filter(
         parent.append(parent_zs)
 
 
+def _apply_rules_to_template(template: etree._Element, rules: dict[str, Any]) -> None:
+    """Patch KPI zone font sizes and row height from dashboard rules.
+
+    Modifies the parsed template XML in-place so that KPI cards use the
+    font size and row height specified in ``rules['kpi']``.
+    """
+    kpi_cfg = rules.get("kpi", {})
+    font_size = str(kpi_cfg.get("font_size", 15))
+    font_color = kpi_cfg.get("font_color", "#111e29")
+    bold = kpi_cfg.get("bold", True)
+    row_height = kpi_cfg.get("row_height")
+
+    for zone in template.iter("zone"):
+        ft = zone.find("formatted-text")
+        if ft is None:
+            continue
+        run = ft.find("run")
+        if run is None or run.text is None:
+            continue
+        slot_text = run.text.strip()
+
+        # Patch KPI slot font settings
+        if slot_text.startswith("KPI_SLOT_"):
+            run.set("fontsize", font_size)
+            run.set("fontcolor", font_color)
+            run.set("bold", "true" if bold else "false")
+
+    # Patch KPI container row height (zone id="16" in all templates)
+    if row_height:
+        for zone in template.iter("zone"):
+            if zone.get("id") == "16":
+                zone.set("fixed-size", str(row_height))
+                h_val = int(row_height * 100000 / 800)  # approximate Tableau units
+                zone.set("h", str(h_val))
+                break
+
+
 def build_c3_zones(
     zones_el: etree._Element,
     id_fn: Callable[[], int],
@@ -435,6 +728,7 @@ def build_c3_zones(
     filter_worksheet: str = "",
     field_registry: Any = None,
     editor: Any = None,
+    rules: dict[str, Any] | None = None,
 ) -> None:
     """Build C3 template by copying Tableau-native XML and swapping names.
 
@@ -453,6 +747,10 @@ def build_c3_zones(
     # Auto-select the best template based on content
     template_xml = _select_template_xml(len(kpi_names), len(chart_names))
     template = etree.fromstring(template_xml)
+
+    # Apply YAML rules to template (font size, row height, etc.)
+    if rules:
+        _apply_rules_to_template(template, rules)
 
     # Build slot→name mappings
     kpi_map: dict[str, str] = {}
@@ -477,6 +775,10 @@ def build_c3_zones(
         if run is None or run.text is None:
             continue
         slot_text = run.text.strip()
+
+        # Logo placeholder — leave as-is (user can replace with image)
+        if slot_text == "LOGO PLACEHOLDER":
+            continue
 
         # Title swap
         if slot_text == "TITLE PLACEHOLDER":

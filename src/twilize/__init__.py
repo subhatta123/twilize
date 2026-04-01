@@ -25,6 +25,13 @@ from .migration import (  # noqa: E402
     preview_twb_migration,
 )
 from .twb_analyzer import AnalysisReport, TWBAnalyzer, analyze_workbook  # noqa: E402
+from .pipeline import (  # noqa: E402
+    build_dashboard_from_csv,
+    build_dashboard_from_hyper,
+    build_dashboard_from_mysql,
+    build_dashboard_from_mssql,
+)
+from .schema_inference import infer_schema  # noqa: E402
 from .twb_editor import TWBEditor  # noqa: E402
 from .validator import SchemaValidationResult, TWBValidationError, validate_against_schema  # noqa: E402
 
@@ -41,9 +48,14 @@ __all__ = [
     "__version__",
     "apply_twb_migration",
     "analyze_workbook",
+    "build_dashboard_from_csv",
+    "build_dashboard_from_hyper",
+    "build_dashboard_from_mysql",
+    "build_dashboard_from_mssql",
     "format_capability_catalog",
     "format_capability_detail",
     "get_capability",
+    "infer_schema",
     "inspect_target_schema",
     "list_capabilities",
     "migrate_twb_guided",

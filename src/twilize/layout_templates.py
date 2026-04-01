@@ -24,7 +24,7 @@ _FILTER_TEXT = "#ffffff"        # Filter text color
 _TEXT_COLOR = "#111e29"         # Standard text color
 _CARD_MARGIN = "4"             # Gap between cards (inner)
 _OUTER_MARGIN = "8"            # Side gutter margin (edges)
-_KPI_HEIGHT = 100              # KPI row fixed height (c.3 uses 100)
+_KPI_HEIGHT = 120              # KPI row fixed height (default; overridden by rules)
 _FILTER_HEIGHT = 30            # Filter bar fixed height
 _TITLE_HEIGHT = 70             # Title bar fixed height
 # Chart area uses weight=1 to fill remaining space after fixed sections
@@ -66,8 +66,8 @@ def _filter_row(
     }
 
 
-def _kpi_row(kpi_names: list[str]) -> dict[str, Any]:
-    """KPI row: 100px fixed, distribute-evenly, matches c.3 zone 16."""
+def _kpi_row(kpi_names: list[str], row_height: int = _KPI_HEIGHT) -> dict[str, Any]:
+    """KPI row: fixed height, distribute-evenly, matches c.3 zone 16."""
     children = []
     for i, name in enumerate(kpi_names):
         # Margins: first gets margin-left=8, last gets margin-right=8,
@@ -90,7 +90,7 @@ def _kpi_row(kpi_names: list[str]) -> dict[str, Any]:
 
     return {
         "type": "container", "direction": "horizontal",
-        "fixed_size": _KPI_HEIGHT,
+        "fixed_size": row_height,
         "layout_strategy": "distribute-evenly",
         "children": children,
     }

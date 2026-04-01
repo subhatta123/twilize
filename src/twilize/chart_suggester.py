@@ -35,7 +35,7 @@ class ChartSuggestion:
     priority: int = 0  # higher = better fit
     top_n: dict | None = field(default=None)  # {"field": ..., "n": 10, "by": "SUM(Sales)"}
     sort_descending: str = ""  # e.g. "SUM(Sales)" — adds descending shelf sort
-    text_format: dict | None = field(default=None)  # {"AVG(Margin)": "0.00%"}
+    text_format: dict | None = field(default=None)  # {"AVG(Margin)": "0%"}
 
 
 @dataclass
@@ -49,7 +49,11 @@ class DashboardSuggestion:
     layout_dict: dict | None = field(default=None)  # Custom FlexNode layout from image
 
 
-def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSuggestion:
+def suggest_charts(
+    schema: ClassifiedSchema,
+    max_charts: int = 14,
+    rules: dict | None = None,
+) -> DashboardSuggestion:
     """Suggest charts based on the classified schema.
 
     Uses rule-based heuristics to pick chart types that best represent
@@ -58,10 +62,16 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
     Args:
         schema: Classified CSV schema with dimension/measure/temporal info.
         max_charts: Maximum number of charts to suggest.
+        rules: Dashboard rules dict (from ``dashboard_rules.load_rules``).
+            When *None*, the built-in defaults are loaded automatically.
 
     Returns:
         DashboardSuggestion with prioritized chart list.
     """
+    if rules is None:
+        from twilize.dashboard_rules import get_default_rules
+        rules = get_default_rules()
+
     suggestions: list[ChartSuggestion] = []
 
     dims = schema.dimensions
@@ -69,17 +79,19 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
     temporal = schema.temporal
     geographic = schema.geographic
 
+    # --- Filter out identifier fields from dimensions ---
+    # ID fields (StudentID, OrderID, etc.) provide no analytical insight as
+    # chart axes. They inflate cardinality and produce unreadable charts.
+    dims = [d for d in dims if not _is_id_field(d.spec.name)]
+
     # --- Always add KPI summaries for top measures ---
-    # Generate up to 4 KPIs when enough measures exist (fills KPI row)
-    kpi_limit = min(4, len(measures))
+    # Generate KPIs up to the limit set in rules (fills KPI row)
+    from twilize.dashboard_rules import kpi_number_format, kpi_max
+    kpi_limit = min(kpi_max(rules), len(measures))
     for m in measures[:kpi_limit]:
         agg = smart_aggregation(m.spec.name)
         kpi_title = _kpi_title(agg, m.spec.name)
-        # Auto-format numbers for readability:
-        #   - Rates/percentages → "12.01%" (not 0.1201)
-        #   - Currency → "$173.0B" (not 173,000,000,000 or ############)
-        #   - Population → "8.5B" (not 85,05,91,27,313)
-        fmt_str = _smart_number_format(m.spec.name, agg)
+        fmt_str = kpi_number_format(m.spec.name, agg, rules)
         kpi_text_fmt = {f"{agg}({m.spec.name})": fmt_str}
         suggestions.append(ChartSuggestion(
             chart_type="Text",
@@ -132,69 +144,145 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
             priority=85,
         ))
 
-    # --- Categorical dim + Measure → Bar chart ---
-    # When the dimension has >10 distinct values, auto-apply a Top 10
-    # filter so the chart stays readable (fixes visual clutter).
-    if cat_dims and measures:
-        dim = _best_categorical_dim(cat_dims)
-        m = measures[0]
-        agg = smart_aggregation(m.spec.name)
-        bar_title = f"Top 10 {dim.spec.name} by {m.spec.name}" if dim.spec.cardinality > 10 else f"{m.spec.name} by {dim.spec.name}"
-        bar_text_fmt = None
-        if _is_rate_field(m.spec.name):
-            bar_text_fmt = {f"{agg}({m.spec.name})": "0.00%"}
-        bar_chart = ChartSuggestion(
-            chart_type="Bar",
-            title=bar_title,
-            shelves=[
-                ShelfAssignment(dim.spec.name, "rows"),
-                ShelfAssignment(m.spec.name, "columns", agg),
-            ],
-            reason="Categorical dimension with numeric measure → horizontal bar chart",
-            priority=80,
-            text_format=bar_text_fmt,
-        )
-        # Attach top-N and sort metadata for pipeline to pick up
-        if dim.spec.cardinality > 10:
-            bar_chart.top_n = {"field": dim.spec.name, "n": 10, "by": f"{agg}({m.spec.name})"}
-        bar_chart.sort_descending = f"{agg}({m.spec.name})"
-        suggestions.append(bar_chart)
+    # --- Categorical dim + Measure → Bar charts (multiple dimensions) ---
+    # Generate bar charts for multiple categorical dimensions to provide
+    # richer analysis (e.g., by Category, Sub-Category, Region, Segment).
+    # Include moderate-to-high cardinality dims with Top N filter.
+    from twilize.dashboard_rules import bar_top_n as _bar_top_n
+    _top_n = _bar_top_n(rules)
+    bar_dims = [d for d in dims if d.semantic_type == "categorical"
+                and d not in temporal and d not in geographic
+                and d.spec.cardinality <= 50]
+    if bar_dims and measures:
+        for dim in bar_dims[:4]:
+            m = measures[0]
+            agg = smart_aggregation(m.spec.name)
+            bar_title = (
+                f"Top {_top_n} {dim.spec.name} by {m.spec.name}"
+                if dim.spec.cardinality > _top_n
+                else f"{m.spec.name} by {dim.spec.name}"
+            )
+            bar_text_fmt = None
+            if _is_rate_field(m.spec.name):
+                bar_text_fmt = {f"{agg}({m.spec.name})": "0%"}
+            bar_chart = ChartSuggestion(
+                chart_type="Bar",
+                title=bar_title,
+                shelves=[
+                    ShelfAssignment(dim.spec.name, "rows"),
+                    ShelfAssignment(m.spec.name, "columns", agg),
+                ],
+                reason="Categorical dimension with numeric measure → horizontal bar chart",
+                priority=80,
+                text_format=bar_text_fmt,
+            )
+            if dim.spec.cardinality > _top_n:
+                bar_chart.top_n = {"field": dim.spec.name, "n": _top_n, "by": f"{agg}({m.spec.name})"}
+            bar_chart.sort_descending = f"{agg}({m.spec.name})"
+            suggestions.append(bar_chart)
 
-    # --- Two measures → Scatter plot ---
+    # --- Two measures → Scatter plot (with strict best-practice guards) ---
+    # Best practice: scatter plots need ≥15 distinct visual data points and
+    # should NOT use identifier fields as detail/color dimensions.
     if len(measures) >= 2:
         m1, m2 = measures[0], measures[1]
         agg1 = smart_aggregation(m1.spec.name)
         agg2 = smart_aggregation(m2.spec.name)
-        shelves = [
-            ShelfAssignment(m1.spec.name, "columns", agg1),
-            ShelfAssignment(m2.spec.name, "rows", agg2),
-        ]
-        # Add detail dimension for scatter granularity + color for grouping
-        # Use a moderate-cardinality dimension to avoid overplotting
-        scatter_detail_dim = None
-        if cat_dims:
-            # Pick best dimension for detail (labelling individual points)
-            all_non_geo = [d for d in dims if d.semantic_type == "categorical"
-                           and d not in temporal and d not in geographic]
-            # For color, prefer low cardinality; for detail prefer higher
-            if all_non_geo:
-                scatter_detail_dim = max(all_non_geo, key=lambda d: d.spec.cardinality)
-                shelves.append(ShelfAssignment(scatter_detail_dim.spec.name, "detail"))
-            if cat_dims[0].spec.cardinality <= 12:
-                shelves.append(ShelfAssignment(cat_dims[0].spec.name, "color"))
-        # Format rate fields on axes
-        scatter_fmt = {}
-        if _is_rate_field(m1.spec.name):
-            scatter_fmt[f"{agg1}({m1.spec.name})"] = "0.00%"
-        if _is_rate_field(m2.spec.name):
-            scatter_fmt[f"{agg2}({m2.spec.name})"] = "0.00%"
+
+        # Skip scatter when both measures use the same aggregation on ID-like
+        # fields — this produces meaningless COUNTD vs COUNTD plots.
+        if not (agg1 == "COUNTD" and agg2 == "COUNTD"):
+            shelves = [
+                ShelfAssignment(m1.spec.name, "columns", agg1),
+                ShelfAssignment(m2.spec.name, "rows", agg2),
+            ]
+            # Add detail dimension for scatter granularity + color for grouping
+            # Use a moderate-cardinality dimension to avoid overplotting.
+            # NEVER use ID fields as detail — they produce unreadable clouds.
+            scatter_detail_dim = None
+            if cat_dims:
+                all_non_geo = [d for d in dims if d.semantic_type == "categorical"
+                               and d not in temporal and d not in geographic
+                               and not _is_id_field(d.spec.name)]
+                if all_non_geo:
+                    # For detail, prefer moderate cardinality (15-100) for readable scatter
+                    good_detail = [d for d in all_non_geo if 15 <= d.spec.cardinality <= 100]
+                    if good_detail:
+                        scatter_detail_dim = good_detail[0]
+                    elif any(d.spec.cardinality >= 6 for d in all_non_geo):
+                        scatter_detail_dim = max(
+                            [d for d in all_non_geo if d.spec.cardinality >= 6],
+                            key=lambda d: d.spec.cardinality,
+                        )
+                    if scatter_detail_dim:
+                        shelves.append(ShelfAssignment(scatter_detail_dim.spec.name, "detail"))
+                # Color: only if ≥4 and ≤12 categories (too few = meaningless clusters)
+                non_id_cats = [d for d in cat_dims if not _is_id_field(d.spec.name)]
+                if non_id_cats and 4 <= non_id_cats[0].spec.cardinality <= 12:
+                    shelves.append(ShelfAssignment(non_id_cats[0].spec.name, "color"))
+            # Format rate fields on axes
+            scatter_fmt = {}
+            if _is_rate_field(m1.spec.name):
+                scatter_fmt[f"{agg1}({m1.spec.name})"] = "0%"
+            if _is_rate_field(m2.spec.name):
+                scatter_fmt[f"{agg2}({m2.spec.name})"] = "0%"
+            suggestions.append(ChartSuggestion(
+                chart_type="Scatterplot",
+                title=f"{m2.spec.name} vs {m1.spec.name}",
+                shelves=shelves,
+                reason="Two numeric measures → scatter plot (≥15 points required)",
+                priority=70,
+                text_format=scatter_fmt or None,
+            ))
+
+    # --- Rate measure × Amount measure → relationship scatter ---
+    # E.g., Profit by Discount — reveals how discounting affects profitability
+    rate_measures = [m for m in measures if _is_rate_field(m.spec.name)]
+    amount_measures = [m for m in measures if _is_currency_field(m.spec.name)]
+    if rate_measures and amount_measures:
+        rate_m = rate_measures[0]
+        # Prefer a secondary amount (e.g. Profit) over the primary (Sales)
+        amt_m = amount_measures[-1] if len(amount_measures) > 1 else amount_measures[0]
+        rate_agg = smart_aggregation(rate_m.spec.name)
+        amt_agg = smart_aggregation(amt_m.spec.name)
+        if not (rate_agg == "COUNTD" and amt_agg == "COUNTD"):
+            rel_shelves = [
+                ShelfAssignment(rate_m.spec.name, "columns", rate_agg),
+                ShelfAssignment(amt_m.spec.name, "rows", amt_agg),
+            ]
+            # Add detail dim for scatter granularity
+            detail_candidates = [d for d in (bar_dims if bar_dims else cat_dims)
+                                 if not _is_id_field(d.spec.name)
+                                 and 6 <= d.spec.cardinality <= 50]
+            if detail_candidates:
+                rel_shelves.append(ShelfAssignment(detail_candidates[0].spec.name, "detail"))
+            suggestions.append(ChartSuggestion(
+                chart_type="Scatterplot",
+                title=f"{amt_m.spec.name} by {rate_m.spec.name}",
+                shelves=rel_shelves,
+                reason="Rate measure vs amount measure → relationship scatter",
+                priority=68,
+                text_format={f"{rate_agg}({rate_m.spec.name})": "0%"},
+            ))
+
+    # --- Count/Quantity measure → distribution bar ---
+    count_measures = [m for m in measures
+                      if any(kw in m.spec.name.lower()
+                             for kw in ("quantity", "qty", "count", "num"))]
+    if count_measures and cat_dims:
+        q_m = count_measures[0]
+        # Use a different dim than the primary bar's best dim
+        q_dim = cat_dims[-1] if len(cat_dims) > 1 else cat_dims[0]
+        q_agg = smart_aggregation(q_m.spec.name)
         suggestions.append(ChartSuggestion(
-            chart_type="Scatterplot",
-            title=f"{m2.spec.name} vs {m1.spec.name}",
-            shelves=shelves,
-            reason="Two numeric measures → scatter plot",
-            priority=70,
-            text_format=scatter_fmt or None,
+            chart_type="Bar",
+            title=f"{q_m.spec.name} by {q_dim.spec.name}",
+            shelves=[
+                ShelfAssignment(q_dim.spec.name, "rows"),
+                ShelfAssignment(q_m.spec.name, "columns", q_agg),
+            ],
+            reason="Count/quantity measure distribution across categories",
+            priority=65,
         ))
 
     # --- Geographic dim + Measure → Map ---
@@ -213,7 +301,8 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
         ))
 
     # --- Categorical dim (few values) + Measure → Pie chart ---
-    small_cat = [d for d in cat_dims if d.spec.cardinality <= 6]
+    from twilize.dashboard_rules import pie_max_slices as _pie_max_slices
+    small_cat = [d for d in cat_dims if d.spec.cardinality <= _pie_max_slices(rules)]
     if small_cat and measures:
         dim = small_cat[0]
         m = measures[0]
@@ -245,20 +334,25 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
             priority=55,
         ))
 
-    # --- Categorical dim + multiple measures → stacked bar ---
+    # --- Categorical dim + multiple measures → grouped bar ---
+    # Prefer currency/amount pairs (e.g. Sales & Profit) for richer comparison
     if cat_dims and len(measures) >= 2:
         dim = _best_categorical_dim(cat_dims)
-        m1, m2 = measures[0], measures[1]
+        currency_ms = [m for m in measures if _is_currency_field(m.spec.name)]
+        if len(currency_ms) >= 2:
+            m1, m2 = currency_ms[0], currency_ms[1]
+        else:
+            m1, m2 = measures[0], measures[1]
         suggestions.append(ChartSuggestion(
             chart_type="Bar",
-            title=f"How do {m1.spec.name} and {m2.spec.name} compare by {dim.spec.name}?",
+            title=f"{m1.spec.name} & {m2.spec.name} by {dim.spec.name}",
             shelves=[
                 ShelfAssignment(dim.spec.name, "rows"),
                 ShelfAssignment(m1.spec.name, "columns", smart_aggregation(m1.spec.name)),
                 ShelfAssignment(m2.spec.name, "columns", smart_aggregation(m2.spec.name)),
             ],
             reason="Category with multiple measures → grouped bar chart",
-            priority=50,
+            priority=78,
         ))
 
     # KPIs are now always added at the top (priority=95)
@@ -282,7 +376,7 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
 
     # Replace fixed priorities with data-driven story scores
     for s in suggestions:
-        s.priority = _story_score(s.chart_type, schema, s.shelves)
+        s.priority = _story_score(s.chart_type, schema, s.shelves, rules)
 
     # Sort by story score and trim
     suggestions.sort(key=lambda s: s.priority, reverse=True)
@@ -305,7 +399,8 @@ def suggest_charts(schema: ClassifiedSchema, max_charts: int = 5) -> DashboardSu
         ]
 
     # --- Best practice: deduplicate chart types ---
-    suggestions = deduplicate_charts(suggestions, max_per_type=2)
+    # Only one chart per non-KPI type to maximise dashboard variety
+    suggestions = deduplicate_charts(suggestions, max_per_type=1)
     suggestions = suggestions[:max_charts]
 
     # Determine layout
@@ -365,8 +460,18 @@ def deduplicate_charts(
         if ct not in type_count:
             type_count[ct] = 0
             type_sigs[ct] = []
-        # Allow more KPI/Text charts since they're compact and high-value
-        effective_max = max_per_type * 2 if ct == "Text" else max_per_type
+        # Allow more KPI/Text charts since they're compact and high-value.
+        # Bar charts get a higher limit to show different dimensions
+        # (e.g., by Category, Region, Segment). Scatter gets 2 for
+        # general correlation + rate-vs-amount relationship charts.
+        if ct == "Text":
+            effective_max = max(4, max_per_type)
+        elif ct == "Bar":
+            effective_max = max(4, max_per_type)
+        elif ct == "Scatterplot":
+            effective_max = max(2, max_per_type)
+        else:
+            effective_max = max_per_type
         if type_count[ct] >= effective_max:
             continue
         # Reject if primary fields match OR full shelf signature matches
@@ -417,6 +522,32 @@ _COUNT_KEYWORDS = {
 }
 
 _ID_KEYWORDS = {"id", "key", "code", "identifier", "uuid"}
+
+_ID_FIELD_PATTERNS = {
+    "id", "key", "code", "identifier", "uuid", "guid",
+    "student_id", "studentid", "order_id", "orderid",
+    "customer_id", "customerid", "product_id", "productid",
+    "employee_id", "employeeid", "user_id", "userid",
+    "transaction_id", "transactionid", "record_id", "recordid",
+}
+
+
+def _is_id_field(field_name: str) -> bool:
+    """Return True if the field is an identifier (ID/key) that should not be
+    used as a chart dimension.
+
+    ID fields produce unreadable charts (e.g., StudentID on a bar chart axis
+    with hundreds of unique values) and offer no analytical insight.
+    """
+    lower = field_name.lower().replace(" ", "_")
+    # Exact match on known ID patterns
+    if lower in _ID_FIELD_PATTERNS:
+        return True
+    # Suffix match: ends with "id", "_id", "key", "_key", "code", "_code"
+    for suffix in ("id", "_id", "key", "_key", "code", "_code", "uuid", "_uuid"):
+        if lower.endswith(suffix) and len(lower) > len(suffix):
+            return True
+    return False
 
 
 def smart_aggregation(field_name: str) -> str:
@@ -487,28 +618,34 @@ def _is_population_field(field_name: str) -> bool:
 
 
 def _smart_number_format(field_name: str, aggregation: str) -> str:
-    """Choose a human-friendly Tableau number format for KPI values.
+    """Choose a Tableau number format for KPI values.
 
-    Uses simple comma-separated formatting by default so that values
-    display correctly regardless of data magnitude.  Abbreviation
-    suffixes (K / M / B) are intentionally avoided because the engine
-    cannot inspect actual data values at suggestion time — using a
-    fixed divisor (e.g. ÷1 B) on smaller datasets causes ``########``
-    overflow or misleading "0.0B" labels.
-
-    For rate/percentage fields that are already stored as 0-1 decimals,
-    a 4-decimal format is used so the raw value is readable.
+    Uses compact formats so values fit in narrow KPI cards:
+    - Rate/percentage fields → ``0%`` (0.156 → 16%)
+    - Currency fields → ``$#,##0,K`` (457753 → $458K)
+    - Count/quantity fields → ``#,##0`` (7571 → 7,571)
+    - Other fields → ``#,##0,K`` (457753 → 458K)
     """
     if _is_rate_field(field_name):
-        return "0.0000"  # show raw decimal (e.g. 0.1599), not percentage
+        return "0%"  # 0.156 → 16% (0 decimal places)
 
-    if _is_currency_field(field_name):
-        return "#,##0"  # plain comma formatting — works for any magnitude
+    lower = field_name.lower()
 
-    if _is_population_field(field_name):
-        return "#,##0"
+    # Count/quantity fields are usually small enough for full display
+    _COUNT_KW = {"quantity", "count", "number", "num", "qty", "units",
+                 "items", "orders", "transactions"}
+    if any(kw in lower for kw in _COUNT_KW) or aggregation in ("COUNT", "COUNTD"):
+        return "#,##0"  # 7571 → 7,571
 
-    return "#,##0"
+    # Currency fields get abbreviated with $ prefix
+    _CURRENCY_KW = {"sales", "revenue", "price", "cost", "profit", "amount",
+                    "income", "expense", "margin", "fee", "payment", "budget",
+                    "spend", "earning"}
+    if any(kw in lower for kw in _CURRENCY_KW):
+        return "$#,##0,K"  # 457753 → $458K
+
+    # Default: abbreviated with K suffix for large numbers
+    return "#,##0,K"  # 457753 → 458K
 
 
 def _kpi_title(aggregation: str, field_name: str) -> str:
@@ -529,6 +666,7 @@ def _story_score(
     chart_type: str,
     schema: ClassifiedSchema,
     shelves: list[ShelfAssignment],
+    rules: dict | None = None,
 ) -> int:
     """Score a chart suggestion by its analytical story value.
 
@@ -556,6 +694,10 @@ def _story_score(
         return 40  # No temporal data — line chart is weak
 
     if chart_type == "Bar":
+        # Grouped bars (multiple measures on columns) are more insightful
+        col_measures = [sh for sh in shelves if sh.shelf == "columns" and sh.aggregation]
+        if len(col_measures) >= 2:
+            return 88  # Multi-measure comparison (e.g. Sales & Profit by Category)
         if cat_dims:
             best_card = max(d.spec.cardinality for d in cat_dims)
             if 3 <= best_card <= 15:
@@ -577,8 +719,10 @@ def _story_score(
                 if sh.shelf in ("color", "detail") and not sh.aggregation
             ]
             if color_dims:
-                # Find the cardinality of the color/detail dimension
                 color_name = color_dims[0].field_name
+                # Reject scatter if the detail/color field is an ID field
+                if _is_id_field(color_name):
+                    return 10  # ID-based scatter is never meaningful
                 color_col = next(
                     (d for d in cat_dims if d.spec.name == color_name), None
                 )
@@ -586,12 +730,14 @@ def _story_score(
             else:
                 visual_points = schema.row_count
 
-            if visual_points >= 15:
-                return 78  # Enough points for correlation
+            from twilize.dashboard_rules import scatter_min_points as _scatter_min
+            _min_pts = _scatter_min(rules) if rules else 15
+            if visual_points >= _min_pts:
+                return 72  # Enough points for correlation (lower than bar/line)
             elif visual_points >= 6:
-                return 60  # Marginal — small scatter
-            return 35  # Too few visual points for meaningful scatter
-        return 30
+                return 50  # Marginal — small scatter
+            return 20  # Too few visual points — use bar chart instead
+        return 15
 
     if chart_type == "Map":
         if geographic:

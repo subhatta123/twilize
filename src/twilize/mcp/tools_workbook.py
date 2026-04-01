@@ -532,6 +532,27 @@ def set_hyper_connection(
 
 
 @server.tool()
+def set_mssql_connection(
+    server_host: str,
+    dbname: str,
+    username: str,
+    table_name: str,
+    port: str = "1433",
+) -> str:
+    """Configure the workbook datasource to use a Microsoft SQL Server connection."""
+
+    _snapshot("set_mssql_connection")
+    editor = get_editor()
+    return editor.set_mssql_connection(
+        server=server_host,
+        dbname=dbname,
+        username=username,
+        table_name=table_name,
+        port=port,
+    )
+
+
+@server.tool()
 def add_dashboard(
     dashboard_name: str,
     worksheet_names: list[str],
