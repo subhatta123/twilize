@@ -86,12 +86,13 @@ def suggest_charts(
 
     # --- Always add KPI summaries for top measures ---
     # Generate KPIs up to the limit set in rules (fills KPI row)
-    from twilize.dashboard_rules import kpi_number_format, kpi_max
+    from twilize.dashboard_rules import kpi_max
+    from twilize.rules_inference import infer_kpi_number_format, infer_aggregation
     kpi_limit = min(kpi_max(rules), len(measures))
     for m in measures[:kpi_limit]:
-        agg = smart_aggregation(m.spec.name)
+        agg = infer_aggregation(m.spec.name, rules) or smart_aggregation(m.spec.name)
         kpi_title = _kpi_title(agg, m.spec.name)
-        fmt_str = kpi_number_format(m.spec.name, agg, rules)
+        fmt_str = infer_kpi_number_format(m.spec.name, agg, rules)
         kpi_text_fmt = {f"{agg}({m.spec.name})": fmt_str}
         suggestions.append(ChartSuggestion(
             chart_type="Text",

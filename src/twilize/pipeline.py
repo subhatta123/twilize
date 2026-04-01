@@ -96,6 +96,13 @@ def build_dashboard_from_csv(
     raw_schema = infer_csv_schema(csv_path, sample_rows=sample_rows)
     classified = classify_columns(raw_schema)
 
+    # Step 2b: Auto-infer formatting rules from data characteristics.
+    # This analyzes actual values (currency symbols, value ranges, decimals)
+    # and merges inferred formats on top of YAML defaults — making the system
+    # work with ANY dataset, not just sales/retail.
+    from twilize.rules_inference import infer_rules_from_schema
+    rules = infer_rules_from_schema(classified, rules)
+
     # Step 3: Chart suggestion (passes rules for KPI formatting)
     if suggestion is None:
         logger.info("Generating chart suggestions")
@@ -132,11 +139,10 @@ def build_dashboard_from_csv(
     for conn_el in editor._datasource.findall(".//connection[@class='hyper']"):
         conn_el.set("dbname", hyper_archive_path)
 
-    # Step 6b: Auto-format measure columns using YAML number format rules.
+    # Step 6b: Auto-format measure columns using data-inferred + YAML rules.
     # Applies default-format on datasource columns so KPI text marks and
     # axis labels render with the correct number format in Tableau.
-    from twilize.chart_suggester import smart_aggregation
-    from twilize.dashboard_rules import kpi_number_format
+    from twilize.rules_inference import infer_kpi_number_format, infer_aggregation
     for col_el in editor._datasource.findall(".//column"):
         col_name = col_el.get("caption") or col_el.get("name", "")
         bare_name = col_name.strip("[]")
@@ -146,8 +152,8 @@ def build_dashboard_from_csv(
             continue  # already formatted
         if col_el.get("datatype") not in ("real", "integer"):
             continue
-        agg = smart_aggregation(bare_name)
-        fmt = kpi_number_format(bare_name, agg, rules)
+        agg = infer_aggregation(bare_name, rules)
+        fmt = infer_kpi_number_format(bare_name, agg, rules)
         col_el.set("default-format", fmt)
         logger.info("Auto-format: %s → %s (agg=%s)", bare_name, fmt, agg)
 
@@ -518,6 +524,10 @@ def _build_dashboard_from_classified(
     if not theme:
         theme = _rules_theme(rules)
 
+    # Auto-infer formatting rules from data characteristics
+    from twilize.rules_inference import infer_rules_from_schema, infer_kpi_number_format, infer_aggregation
+    rules = infer_rules_from_schema(classified, rules)
+
     # Chart suggestion
     suggestion = suggest_charts(classified, max_charts=max_charts, rules=rules)
     suggestion = validate_suggestion(suggestion, classified, max_charts, rules=rules)
@@ -531,8 +541,7 @@ def _build_dashboard_from_classified(
     # Auto-filters
     auto_filters = select_auto_filters(classified, max_filters=_rules_max_filters(rules))
 
-    # Auto-format measure columns using YAML number format rules
-    from twilize.chart_suggester import smart_aggregation
+    # Auto-format measure columns using data-inferred + YAML rules
     for col_el in editor._datasource.findall(".//column"):
         col_name = col_el.get("caption") or col_el.get("name", "")
         bare_name = col_name.strip("[]")
@@ -542,8 +551,8 @@ def _build_dashboard_from_classified(
             continue
         if col_el.get("datatype") not in ("real", "integer"):
             continue
-        agg = smart_aggregation(bare_name)
-        fmt = kpi_number_format(bare_name, agg, rules)
+        agg = infer_aggregation(bare_name, rules)
+        fmt = infer_kpi_number_format(bare_name, agg, rules)
         col_el.set("default-format", fmt)
         logger.info("Auto-format: %s → %s (agg=%s)", bare_name, fmt, agg)
 
