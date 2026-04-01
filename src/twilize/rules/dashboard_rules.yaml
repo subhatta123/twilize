@@ -1,8 +1,8 @@
 # =============================================================================
-# Twilize Dashboard Creation Rules
+# Twilize Dashboard Creation Rules (Package Bundle)
 # =============================================================================
-# Plain-English rules enforced at tool execution time.
-# Edit this file to change how dashboards are built — no Python needed.
+# This file is bundled inside the twilize package for the rules_engine.
+# It uses the unified key format shared with references/dashboard_rules.yaml.
 #
 # Rule severities:
 #   error   — blocks the tool call, must be fixed before proceeding
@@ -15,18 +15,18 @@ version: 1
 # ---------------------------------------------------------------------------
 # KPI / Big Ass Number Rules
 # ---------------------------------------------------------------------------
-kpi_rules:
-  max_kpis_per_dashboard: 4
+kpi:
+  font_size: 28
+  font_color: "#333333"
+  bold: true
+  row_height: 120
+  max_kpis: 4
   max_metrics_per_kpi_card: 5
   placement: "top_row"
-  fixed_height_px_min: 40
-  fixed_height_px_max: 100
-  require_comparison_context: true   # should show vs-prior or vs-target
+  require_comparison_context: true
   ordering: "primary_metric_first_then_ratios_then_volume"
   severity: "warning"
 
-  # Short display names — the rules engine replaces verbose expressions
-  # in KPI titles with concise labels.
   shorten_names:
     "SUM(Sales)": "Sales"
     "SUM(Profit)": "Profit"
@@ -39,28 +39,55 @@ kpi_rules:
     "COUNTD(Customer ID)": "Customers"
     "COUNTD(Product ID)": "Products"
 
+  number_formats:
+    - match: [rate, ratio, pct, percent, margin, yield, share, penetration, conversion, churn, retention, utilization, efficiency, coverage, discount]
+      format: "0.0%"
+      description: "Rates and percentages"
+
+    - match: [sales, revenue, price, cost, profit, amount, income, expense, fee, payment, budget, spend, earning, total]
+      format: "$#,##0,K"
+      description: "Currency values (abbreviated with K)"
+
+    - match: [quantity, count, number, num, qty, units, items, orders, transactions]
+      format: "#,##0"
+      description: "Counts and quantities (full number)"
+
+  default_format: "#,##0,K"
+
+  aggregation_overrides:
+    COUNT: "#,##0"
+    COUNTD: "#,##0"
+
 # ---------------------------------------------------------------------------
-# Chart Count & Composition Rules
+# Chart Defaults & Composition Rules
 # ---------------------------------------------------------------------------
-chart_count_rules:
-  max_charts_per_dashboard: 5        # including KPIs
-  max_chart_types_per_dashboard: 3   # e.g. Bar + Line + Map = 3
+charts:
+  max_charts: 9
+  max_charts_per_dashboard: 9
+  max_chart_types_per_dashboard: 3
   require_at_least_one_kpi: true
   severity: "error"
+
+  bar_top_n: 10
+  axis_format: "#,##0"
+  pie_max_slices: 5
+  scatter_min_points: 15
+  map_null_threshold: 0.10
+  map_latlong_null_threshold: 0.20
+  theme: "modern-light"
 
 # ---------------------------------------------------------------------------
 # Map Rules
 # ---------------------------------------------------------------------------
 map_rules:
-  min_geo_coverage_pct: 80           # reject if >20% null geo values
-  min_unique_locations: 4            # don't map 2-3 regions — use bar
+  min_geo_coverage_pct: 80
+  min_unique_locations: 4
   required_encodings:
     - "color"
     - "tooltip"
   warn_if_no_legend: true
   severity: "warning"
 
-  # Conditions under which a bar chart should be used instead of a map
   prefer_bar_chart_when:
     - "question_is_ranking_by_region"
     - "precise_value_comparison_needed"
@@ -73,10 +100,9 @@ theme_rules:
   require_theme: true
   default_theme: "modern-light"
   apply_to_all_dashboards: true
-  color_accessibility: "colorblind_safe"   # reject red-green combos
+  color_accessibility: "colorblind_safe"
   severity: "warning"
 
-  # Default styling constants (overridable by theme presets)
   defaults:
     background: "#e6e6e6"
     card_background: "#ffffff"
@@ -92,7 +118,7 @@ bar_chart_rules:
   max_categories: 15
   prefer_horizontal: true
   never_for_time_series: true
-  auto_fix_sort: true                # auto-add sort_descending if missing
+  auto_fix_sort: true
   severity: "warning"
 
 # ---------------------------------------------------------------------------
@@ -125,18 +151,37 @@ scatter_plot_rules:
 # ---------------------------------------------------------------------------
 # Layout Rules
 # ---------------------------------------------------------------------------
-layout_rules:
+layout:
+  width: 1200
+  height: 800
+  background_color: "#e6e6e6"
+  card_background: "#ffffff"
   require_information_hierarchy: true
   kpi_position: "top"
   primary_view_position: "center"
   filter_sidebar_position: "right"
-  filter_sidebar_width_px_min: 120
-  filter_sidebar_width_px_max: 200
-  require_at_least_one_filter_action: true
   require_filter_sidebar: true
   max_dashboard_width: 1400
   max_dashboard_height: 900
   severity: "warning"
+
+  template: "executive-summary"
+
+  title:
+    height: 70
+    font_size: 20
+    font_color: "#111e29"
+    bold: true
+
+  filters:
+    height: 30
+    font_size: 12
+    background_color: "#192f3e"
+    font_color: "#ffffff"
+    max_filters: 3
+
+  card_margin: 4
+  outer_margin: 8
 
 # ---------------------------------------------------------------------------
 # Aggregation Rules
@@ -145,7 +190,6 @@ aggregation_rules:
   auto_detect_from_name: true
   severity: "info"
 
-  # Field-name keyword → aggregation mapping
   rates_and_percentages:
     aggregation: "AVG"
     keywords:
@@ -208,12 +252,11 @@ number_format_rules:
   severity: "info"
 
   mappings:
-    currency: "$#,##0"
-    percentage: "p0.00%"
+    currency: "$#,##0,K"
+    percentage: "0.0%"
     integer: "#,##0"
     decimal: "#,##0.00"
 
-  # Field-name keyword → format type
   field_patterns:
     currency:
       - "sales"

@@ -7,11 +7,14 @@ helper branch.
 
 from __future__ import annotations
 
+import logging
 from typing import Optional, Union
 
 from lxml import etree
 
 from .builder_base import BaseChartBuilder
+
+logger = logging.getLogger(__name__)
 
 
 class TextChartBuilder(BaseChartBuilder):
@@ -176,5 +179,24 @@ class TextChartBuilder(BaseChartBuilder):
                     fmt.set("attr", "text-format")
                     fmt.set("field", full_ref)
                     fmt.set("value", fmt_str)
+                    logger.info("Applied text-format: %s → %s", field_expr, fmt_str)
+                else:
+                    # Fallback: try partial match against registered instances
+                    matched = False
+                    for key, inst in instances.items():
+                        if field_expr in key or key in field_expr:
+                            full_ref = self.field_registry.resolve_full_reference(inst.instance_name)
+                            fmt = etree.SubElement(cell_rule, "format")
+                            fmt.set("attr", "text-format")
+                            fmt.set("field", full_ref)
+                            fmt.set("value", fmt_str)
+                            logger.info("Applied text-format (partial match): %s → %s (via %s)", field_expr, fmt_str, key)
+                            matched = True
+                            break
+                    if not matched:
+                        logger.warning(
+                            "text_format: field '%s' not found in instances %s — format '%s' not applied",
+                            field_expr, list(instances.keys()), fmt_str,
+                        )
 
         return f"Configured worksheet '{self.worksheet_name}' as Text chart"

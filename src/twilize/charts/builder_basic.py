@@ -20,9 +20,12 @@ Returned value: worksheet_name (str) — the caller uses this to confirm
 which worksheet was modified.
 """
 
+import logging
 import re
 from typing import Optional, Union
 from lxml import etree
+
+logger = logging.getLogger(__name__)
 
 from .builder_base import BaseChartBuilder
 from .helpers import _get_or_create_table_style
@@ -241,6 +244,23 @@ class BasicChartBuilder(BaseChartBuilder):
                     fmt.set("attr", "text-format")
                     fmt.set("field", full_ref)
                     fmt.set("value", fmt_str)
+                else:
+                    # Fallback: try partial match against registered instances
+                    matched = False
+                    for key, inst in instances.items():
+                        if field_expr in key or key in field_expr:
+                            full_ref = self.field_registry.resolve_full_reference(inst.instance_name)
+                            fmt = etree.SubElement(cell_rule, "format")
+                            fmt.set("attr", "text-format")
+                            fmt.set("field", full_ref)
+                            fmt.set("value", fmt_str)
+                            matched = True
+                            break
+                    if not matched:
+                        logger.warning(
+                            "text_format: field '%s' not found in instances %s — format '%s' not applied",
+                            field_expr, list(instances.keys()), fmt_str,
+                        )
 
         # Color map (datasource-level palette mapping)
         if self.color_map and self.color:

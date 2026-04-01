@@ -182,8 +182,29 @@ class RulesEngine:
     # -- helpers ----------------------------------------------------------
 
     def _r(self, section: str) -> dict[str, Any]:
-        """Get a rules section, returning empty dict if absent."""
-        return self.rules.get(section, {})
+        """Get a rules section, returning empty dict if absent.
+
+        Supports both the legacy key format (``kpi_rules``, ``bar_chart_rules``)
+        and the unified format (``kpi``, ``charts``, ``layout``).  The unified
+        format uses shorter top-level keys that match the accessor functions
+        in ``dashboard_rules.py``.
+        """
+        val = self.rules.get(section)
+        if val is not None:
+            return val
+        # Fallback mappings: new → legacy and legacy → new
+        _ALIASES: dict[str, str] = {
+            "kpi_rules": "kpi",
+            "chart_count_rules": "charts",
+            "layout_rules": "layout",
+            "kpi": "kpi_rules",
+            "charts": "chart_count_rules",
+            "layout": "layout_rules",
+        }
+        alias = _ALIASES.get(section, "")
+        if alias:
+            return self.rules.get(alias, {})
+        return {}
 
     def _severity(self, section: str, default: str = "warning") -> str:
         return self._r(section).get("severity", default)
@@ -301,7 +322,7 @@ class RulesEngine:
             kr = self._r("kpi_rules")
             if kr:
                 mv = kwargs.get("measure_values", [])
-                max_metrics = kr.get("max_metrics_per_kpi_card", 5)
+                max_metrics = kr.get("max_metrics_per_kpi_card", kr.get("max_kpis", 5))
                 if len(mv) > max_metrics:
                     violations.append(RuleViolation(
                         rule_id="kpi.too_many_metrics",
@@ -331,7 +352,7 @@ class RulesEngine:
         # --- Chart count ---
         cc = self._r("chart_count_rules")
         if cc:
-            max_charts = cc.get("max_charts_per_dashboard", 5)
+            max_charts = cc.get("max_charts_per_dashboard", cc.get("max_charts", 5))
             if len(worksheet_names) > max_charts:
                 violations.append(RuleViolation(
                     rule_id="dashboard.too_many_charts",

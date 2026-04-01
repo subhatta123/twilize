@@ -681,16 +681,33 @@ def _swap_text_to_filter(
 
 
 def _apply_rules_to_template(template: etree._Element, rules: dict[str, Any]) -> None:
-    """Patch KPI zone font sizes and row height from dashboard rules.
+    """Patch template zones with dashboard rules (KPI fonts, title, filter bar, backgrounds).
 
-    Modifies the parsed template XML in-place so that KPI cards use the
-    font size and row height specified in ``rules['kpi']``.
+    Modifies the parsed template XML in-place so that:
+    - KPI cards use the font size, color, and row height from ``rules['kpi']``
+    - Title bar uses font settings from ``rules['layout']['title']``
+    - Filter bar uses background/font settings from ``rules['layout']['filters']``
+    - Card backgrounds use the color from ``rules['layout']['card_background']``
     """
     kpi_cfg = rules.get("kpi", {})
-    font_size = str(kpi_cfg.get("font_size", 15))
-    font_color = kpi_cfg.get("font_color", "#111e29")
-    bold = kpi_cfg.get("bold", True)
-    row_height = kpi_cfg.get("row_height")
+    layout_cfg = rules.get("layout", {})
+    title_cfg = layout_cfg.get("title", {})
+    filter_cfg = layout_cfg.get("filters", {})
+
+    kpi_font_size = str(kpi_cfg.get("font_size", 15))
+    kpi_font_color = kpi_cfg.get("font_color", "#111e29")
+    kpi_bold = kpi_cfg.get("bold", True)
+    kpi_row_height = kpi_cfg.get("row_height")
+
+    title_font_size = str(title_cfg.get("font_size", 20))
+    title_font_color = title_cfg.get("font_color", "#111e29")
+    title_bold = title_cfg.get("bold", True)
+
+    filter_bg = filter_cfg.get("background_color", "#192f3e")
+    filter_font_color = filter_cfg.get("font_color", "#ffffff")
+    filter_font_size = str(filter_cfg.get("font_size", 12))
+
+    card_bg = layout_cfg.get("card_background", "#ffffff")
 
     for zone in template.iter("zone"):
         ft = zone.find("formatted-text")
@@ -703,18 +720,60 @@ def _apply_rules_to_template(template: etree._Element, rules: dict[str, Any]) ->
 
         # Patch KPI slot font settings
         if slot_text.startswith("KPI_SLOT_"):
-            run.set("fontsize", font_size)
-            run.set("fontcolor", font_color)
-            run.set("bold", "true" if bold else "false")
+            run.set("fontsize", kpi_font_size)
+            run.set("fontcolor", kpi_font_color)
+            run.set("bold", "true" if kpi_bold else "false")
+            # Update card background
+            _set_zone_bg(zone, card_bg)
+
+        # Patch title font settings
+        if slot_text == "TITLE PLACEHOLDER":
+            run.set("fontsize", title_font_size)
+            run.set("fontcolor", title_font_color)
+            run.set("bold", "true" if title_bold else "false")
+
+        # Patch filter bar font settings
+        if slot_text == "FILTERS PLACEHOLDER":
+            run.set("fontsize", filter_font_size)
+            run.set("fontcolor", filter_font_color)
+
+        # Patch sheet slot card backgrounds
+        if slot_text.startswith("SHEET_SLOT_"):
+            _set_zone_bg(zone, card_bg)
+
+    # Patch filter container background (zone id="3" in all templates)
+    for zone in template.iter("zone"):
+        if zone.get("id") == "3":
+            zone_style = zone.find("zone-style")
+            if zone_style is not None:
+                for fmt in zone_style.findall("format"):
+                    if fmt.get("attr") == "background-color":
+                        fmt.set("value", filter_bg)
+            break
 
     # Patch KPI container row height (zone id="16" in all templates)
-    if row_height:
+    if kpi_row_height:
         for zone in template.iter("zone"):
             if zone.get("id") == "16":
-                zone.set("fixed-size", str(row_height))
-                h_val = int(row_height * 100000 / 800)  # approximate Tableau units
+                zone.set("fixed-size", str(kpi_row_height))
+                h_val = int(kpi_row_height * 100000 / 800)  # approximate Tableau units
                 zone.set("h", str(h_val))
                 break
+
+
+def _set_zone_bg(zone: etree._Element, color: str) -> None:
+    """Set the background-color format on a zone's zone-style."""
+    zone_style = zone.find("zone-style")
+    if zone_style is None:
+        return
+    for fmt in zone_style.findall("format"):
+        if fmt.get("attr") == "background-color":
+            fmt.set("value", color)
+            return
+    # Add background-color format if not present
+    fmt = etree.SubElement(zone_style, "format")
+    fmt.set("attr", "background-color")
+    fmt.set("value", color)
 
 
 def build_c3_zones(

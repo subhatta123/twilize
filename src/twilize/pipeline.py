@@ -132,14 +132,11 @@ def build_dashboard_from_csv(
     for conn_el in editor._datasource.findall(".//connection[@class='hyper']"):
         conn_el.set("dbname", hyper_archive_path)
 
-    # Step 6b: Auto-format measure columns (Number Custom, 0 decimals)
+    # Step 6b: Auto-format measure columns using YAML number format rules.
     # Applies default-format on datasource columns so KPI text marks and
     # axis labels render with the correct number format in Tableau.
-    from twilize.chart_suggester import (
-        _is_rate_field,
-        _is_currency_field,
-        _is_population_field,
-    )
+    from twilize.chart_suggester import smart_aggregation
+    from twilize.dashboard_rules import kpi_number_format
     for col_el in editor._datasource.findall(".//column"):
         col_name = col_el.get("caption") or col_el.get("name", "")
         bare_name = col_name.strip("[]")
@@ -147,10 +144,12 @@ def build_dashboard_from_csv(
             continue
         if col_el.get("default-format"):
             continue  # already formatted
-        if _is_rate_field(bare_name):
-            col_el.set("default-format", "0%")
-        elif col_el.get("datatype") in ("real", "integer"):
-            col_el.set("default-format", "#,##0")
+        if col_el.get("datatype") not in ("real", "integer"):
+            continue
+        agg = smart_aggregation(bare_name)
+        fmt = kpi_number_format(bare_name, agg, rules)
+        col_el.set("default-format", fmt)
+        logger.info("Auto-format: %s → %s (agg=%s)", bare_name, fmt, agg)
 
     # Step 7: Create worksheets and configure charts
     worksheet_names = []
@@ -509,8 +508,8 @@ def _build_dashboard_from_classified(
         theme_name as _rules_theme,
         max_filters as _rules_max_filters,
         dashboard_background,
+        kpi_number_format,
     )
-    from twilize.chart_suggester import _is_rate_field
 
     if rules is None:
         rules = load_rules()
@@ -532,7 +531,8 @@ def _build_dashboard_from_classified(
     # Auto-filters
     auto_filters = select_auto_filters(classified, max_filters=_rules_max_filters(rules))
 
-    # Auto-format measure columns
+    # Auto-format measure columns using YAML number format rules
+    from twilize.chart_suggester import smart_aggregation
     for col_el in editor._datasource.findall(".//column"):
         col_name = col_el.get("caption") or col_el.get("name", "")
         bare_name = col_name.strip("[]")
@@ -540,10 +540,12 @@ def _build_dashboard_from_classified(
             continue
         if col_el.get("default-format"):
             continue
-        if _is_rate_field(bare_name):
-            col_el.set("default-format", "0%")
-        elif col_el.get("datatype") in ("real", "integer"):
-            col_el.set("default-format", "#,##0")
+        if col_el.get("datatype") not in ("real", "integer"):
+            continue
+        agg = smart_aggregation(bare_name)
+        fmt = kpi_number_format(bare_name, agg, rules)
+        col_el.set("default-format", fmt)
+        logger.info("Auto-format: %s → %s (agg=%s)", bare_name, fmt, agg)
 
     # Create worksheets
     worksheet_names = []
