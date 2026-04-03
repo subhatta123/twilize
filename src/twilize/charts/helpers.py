@@ -101,6 +101,17 @@ def setup_table_style(table: etree._Element, mark_type: str) -> None:
             fmt.set("attr", attr)
             fmt.set("value", val)
 
+        # Set header width so KPI values don't overflow as "########"
+        header_rule = etree.SubElement(table_style, "style-rule")
+        header_rule.set("element", "header")
+        for attr, val in (
+            ("width", "200"),
+            ("minwidth", "120"),
+        ):
+            fmt = etree.SubElement(header_rule, "format")
+            fmt.set("attr", attr)
+            fmt.set("value", val)
+
         label_rule = etree.SubElement(table_style, "style-rule")
         label_rule.set("element", "label")
         for attr, val in (
@@ -575,6 +586,17 @@ def apply_measure_values(
         ("font-family", "Tableau Book"),
     ):
         fmt = etree.SubElement(cell_rule, "format")
+        fmt.set("attr", attr)
+        fmt.set("value", val)
+
+    # Set header width so KPI values don't overflow as "########"
+    header_rule = etree.SubElement(table_style, "style-rule")
+    header_rule.set("element", "header")
+    for attr, val in (
+        ("width", "200"),
+        ("minwidth", "120"),
+    ):
+        fmt = etree.SubElement(header_rule, "format")
         fmt.set("attr", attr)
         fmt.set("value", val)
 

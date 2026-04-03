@@ -119,5 +119,6 @@ charts:
   map_latlong_null_threshold: 0.20
 
   # Theme preset name.
-  # Options: modern-light, modern-dark, classic, minimal
+  # Options: modern-light, corporate-blue, dark, minimal, vibrant
+  # Aliases: modern-dark → dark, classic → corporate-blue
   theme: "modern-light"

@@ -11,7 +11,7 @@ class TestDashboardActions(unittest.TestCase):
     def test_filter_action(self):
         # 1. Setup worksheets
         self.editor.add_worksheet("SourceMap")
-        self.editor.configure_chart("SourceMap", mark_type="Circle", columns=["SUM(Sales)"], rows=["State"])
+        self.editor.configure_chart("SourceMap", mark_type="Circle", columns=["SUM(Sales)"], rows=["State/Province"])
         
         self.editor.add_worksheet("TargetBar")
         self.editor.configure_chart("TargetBar", mark_type="Bar", columns=["SUM(Profit)"], rows=["Category"])
@@ -25,7 +25,7 @@ class TestDashboardActions(unittest.TestCase):
             action_type="filter",
             source_sheet="SourceMap",
             target_sheet="TargetBar",
-            fields=["State"],
+            fields=["State/Province"],
             event_type="on-select",
         )
         self.assertIn("Added filter action", msg)
@@ -58,7 +58,7 @@ class TestDashboardActions(unittest.TestCase):
         self.assertEqual(target_param.get("value"), "ActionTestDash")
 
         exclude_param = next(p for p in params if p.get("name") == "exclude")
-        # In this dashboard we expect TargetBar to be excluded since standard interactions target dashboard 
+        # Global filter: only the source sheet is excluded so the filter applies to all others
         self.assertEqual(exclude_param.get("value"), "SourceMap")
 
 if __name__ == "__main__":

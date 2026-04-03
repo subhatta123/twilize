@@ -83,7 +83,9 @@ def add_dashboard_action(
             if ws_name and ws_name not in all_sheets:
                 all_sheets.append(ws_name)
 
-    exclude_sheets = [sheet for sheet in all_sheets if sheet != target_sheet]
+    # For global filtering, only exclude the source sheet so the filter
+    # applies to ALL other worksheets on the dashboard.
+    exclude_sheets = [source_sheet] if source_sheet in all_sheets else []
 
     if action_type == "filter":
         _configure_filter_action(

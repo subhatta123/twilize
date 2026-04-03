@@ -171,6 +171,20 @@ class TextChartBuilder(BaseChartBuilder):
             table_style = _get_or_create_table_style(table)
             cell_rule = etree.SubElement(table_style, "style-rule")
             cell_rule.set("element", "cell")
+
+            # When using Measure Values, the display field is [Multiple Values],
+            # not the individual measure fields.  Apply format there so Tableau
+            # actually renders the abbreviated number (e.g. $458K instead of ########).
+            if self.measure_values:
+                # Use the first format string — all KPI measures share it in MV mode
+                first_fmt = next(iter(self.text_format.values()))
+                mv_ref = f"[{ds_name}].[Multiple Values]"
+                fmt = etree.SubElement(cell_rule, "format")
+                fmt.set("attr", "text-format")
+                fmt.set("field", mv_ref)
+                fmt.set("value", first_fmt)
+                logger.info("Applied text-format to [Multiple Values]: %s", first_fmt)
+
             for field_expr, fmt_str in self.text_format.items():
                 ci = instances.get(field_expr)
                 if ci:

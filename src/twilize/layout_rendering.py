@@ -193,6 +193,8 @@ def _render_filter(
         zone.set("mode", node.mode)
     if not node.show_title:
         zone.set("show-title", "false")
+    # Make filter apply globally to all worksheets using related datasource
+    zone.set("apply-to-worksheets", "allUsingRelatedDatasource")
 
     found_param = _find_filter_param(node, context)
     if found_param:

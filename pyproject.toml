@@ -1,6 +1,6 @@
 [project]
 name = "twilize"
-version = "0.18.0"
+version = "0.20.0"
 description = "Tableau Workbook (.twb) generation toolkit and MCP server"
 authors = [{name = "Suddhasheel Bhattacharya", email = "suddhasheel.bhattacharya@gmail.com"}]
 readme = "README.md"
@@ -69,6 +69,7 @@ extension = [
 
 [project.scripts]
 twilize = "twilize.server:main"
+twilize-rules = "twilize.rules_cli:main"
 
 [project.urls]
 Homepage = "https://github.com/subhatta123/twilize"

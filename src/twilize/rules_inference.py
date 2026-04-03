@@ -224,24 +224,37 @@ def infer_kpi_number_format(
     aggregation: str,
     rules: dict[str, Any],
 ) -> str:
-    """Get the number format for a field, checking inferred formats first.
+    """Get the number format for a field, respecting YAML overrides.
 
     Priority:
-      1. ``rules['_field_formats'][field_name]`` — data-inferred format
-      2. ``rules['kpi']['number_formats']`` — YAML keyword rules
-      3. ``rules['kpi']['default_format']`` — fallback
+      1. ``rules['kpi']['aggregation_overrides']`` — COUNT/COUNTD always win
+      2. ``rules['kpi']['number_formats']`` — YAML keyword rules (admin-set)
+      3. ``rules['_field_formats'][field_name]`` — data-inferred format
+      4. ``rules['kpi']['default_format']`` — fallback
 
-    This replaces direct calls to ``kpi_number_format`` in the pipeline
-    when inferred rules are available.
+    YAML keyword rules take precedence over data inference because they
+    represent intentional admin/user configuration (e.g. "sales → $#,##0,K").
+    Data inference is a best-guess that can be wrong when values lack
+    currency symbols or have ambiguous decimal patterns.
     """
-    # Check data-inferred formats first
+    from twilize.dashboard_rules import kpi_number_format
+
+    # Check YAML keyword rules first (includes aggregation overrides)
+    kpi = rules.get("kpi", {})
+    default_fmt = kpi.get("default_format", "#,##0")
+
+    yaml_fmt = kpi_number_format(field_name, aggregation, rules)
+    if yaml_fmt != default_fmt:
+        # YAML had a specific keyword or aggregation match — use it
+        return yaml_fmt
+
+    # Fall back to data-inferred formats
     field_fmts = rules.get("_field_formats", {})
     if field_name in field_fmts:
         return field_fmts[field_name]
 
-    # Fall back to YAML keyword rules
-    from twilize.dashboard_rules import kpi_number_format
-    return kpi_number_format(field_name, aggregation, rules)
+    # No specific match anywhere — use YAML default
+    return default_fmt
 
 
 def infer_aggregation(

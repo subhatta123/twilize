@@ -72,6 +72,25 @@ class ChartsMixin:
     ) -> str:
         """Route chart configuration to the correct builder."""
 
+        # Recipe-level patterns need dual-axis composition, not basic builder.
+        # Redirect to configure_chart_recipe so they render correctly.
+        _RECIPE_ALIASES = {
+            "Lollipop": ("lollipop", "dimension", "measure"),
+            "lollipop": ("lollipop", "dimension", "measure"),
+            "Donut": ("donut", "category", "measure"),
+            "donut": ("donut", "category", "measure"),
+        }
+        if mark_type in _RECIPE_ALIASES:
+            recipe_name, dim_key, meas_key = _RECIPE_ALIASES[mark_type]
+            dim = (rows or [None])[0]
+            meas = (columns or [None])[0]
+            if dim and meas:
+                return self.configure_chart_recipe(
+                    worksheet_name,
+                    recipe_name=recipe_name,
+                    recipe_args={dim_key: dim, meas_key: meas},
+                )
+
         return dispatch_configure_chart(
             self,
             worksheet_name=worksheet_name,

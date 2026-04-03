@@ -147,38 +147,37 @@ def auto_add_actions(
 
     results: list[str] = []
 
-    # Filter action: first worksheet → all others
+    # Filter action: first worksheet → all others (single global action)
     source = worksheet_names[0]
-    for target in worksheet_names[1:]:
-        try:
-            msg = editor.add_dashboard_action(
-                dashboard_name=dashboard_name,
-                action_type="filter",
-                source_sheet=source,
-                target_sheet=target,
-                fields=[best_dim],
-                event_type="on-select",
-                caption=f"Filter by {best_dim}",
-            )
-            results.append(msg)
-        except Exception as exc:
-            logger.warning("Failed to add filter action: %s", exc)
+    first_target = worksheet_names[1]
+    try:
+        msg = editor.add_dashboard_action(
+            dashboard_name=dashboard_name,
+            action_type="filter",
+            source_sheet=source,
+            target_sheet=first_target,
+            fields=[best_dim],
+            event_type="on-select",
+            caption=f"Filter by {best_dim}",
+        )
+        results.append(msg)
+    except Exception as exc:
+        logger.warning("Failed to add filter action: %s", exc)
 
-    # Highlight action: first worksheet → all others
-    for target in worksheet_names[1:]:
-        try:
-            msg = editor.add_dashboard_action(
-                dashboard_name=dashboard_name,
-                action_type="highlight",
-                source_sheet=source,
-                target_sheet=target,
-                fields=[best_dim],
-                event_type="on-select",
-                caption=f"Highlight {best_dim}",
-            )
-            results.append(msg)
-        except Exception as exc:
-            logger.warning("Failed to add highlight action: %s", exc)
+    # Highlight action: first worksheet → all others (single global action)
+    try:
+        msg = editor.add_dashboard_action(
+            dashboard_name=dashboard_name,
+            action_type="highlight",
+            source_sheet=source,
+            target_sheet=first_target,
+            fields=[best_dim],
+            event_type="on-select",
+            caption=f"Highlight {best_dim}",
+        )
+        results.append(msg)
+    except Exception as exc:
+        logger.warning("Failed to add highlight action: %s", exc)
 
     return results
 

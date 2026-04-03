@@ -104,16 +104,24 @@ _PRESETS: dict[str, ThemePreset] = {
     ),
 }
 
-THEME_NAMES: list[str] = list(_PRESETS.keys())
+# Aliases map common alternative names to canonical presets.
+_ALIASES: dict[str, str] = {
+    "modern-dark": "dark",
+    "classic": "corporate-blue",
+}
+
+THEME_NAMES: list[str] = list(_PRESETS.keys()) + list(_ALIASES.keys())
 
 
 def get_theme(name: str) -> ThemePreset:
-    """Get a theme preset by name.
+    """Get a theme preset by name (supports aliases like ``modern-dark``).
 
     Raises:
         ValueError: If the theme name is not recognized.
     """
-    preset = _PRESETS.get(name)
+    # Resolve alias first
+    canonical = _ALIASES.get(name, name)
+    preset = _PRESETS.get(canonical)
     if preset is None:
         raise ValueError(
             f"Unknown theme '{name}'. Available: {', '.join(THEME_NAMES)}"

@@ -658,6 +658,7 @@ def _swap_text_to_filter(
         fz.set("name", filter_worksheet)
         fz.set("mode", "dropdown")
         fz.set("show-title", "true")
+        fz.set("apply-to-worksheets", "allUsingRelatedDatasource")
         fz.set("x", str(667 + fi * fw))
         fz.set("y", str(base_y))
         fz.set("w", str(fw))
