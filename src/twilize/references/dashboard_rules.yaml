@@ -13,8 +13,8 @@
 
 # ── KPI / Big-Ass-Number Formatting ──────────────────────────────────
 kpi:
-  # Font size for KPI values (Tableau points).  15 = compact, 28-36 = BAN style.
-  font_size: 28
+  # Font size for KPI values (Tableau points).  KB recommends 20-24pt.
+  font_size: 22
 
   # Font color for KPI values (hex).
   font_color: "#333333"
@@ -23,7 +23,7 @@ kpi:
   bold: true
 
   # Fixed height of the KPI row in pixels.
-  row_height: 120
+  row_height: 100
 
   # Maximum number of KPI cards in one row.
   max_kpis: 4
@@ -35,19 +35,22 @@ kpi:
   # If no rule matches, "default_format" is used.
   number_formats:
     - match: [rate, ratio, pct, percent, margin, yield, share, penetration, conversion, churn, retention, utilization, efficiency, coverage, discount]
-      format: "0.0%"
-      description: "Rates and percentages"
+      format: "0.00%"
+      description: "Rates and percentages (2 decimal places)"
 
     - match: [sales, revenue, price, cost, profit, amount, income, expense, fee, payment, budget, spend, earning, total]
-      format: "$#,##0,K"
-      description: "Currency values (abbreviated with K)"
+      format: "$#,##0"
+      description: "Currency values (whole dollars, fits KPI tiles)"
 
     - match: [quantity, count, number, num, qty, units, items, orders, transactions]
       format: "#,##0"
       description: "Counts and quantities (full number)"
 
+  # Maximum decimal places shown in KPI values (caps all formats).
+  max_decimal_places: 2
+
   # Fallback format when no rule matches.
-  default_format: "#,##0,K"
+  default_format: "#,##0"
 
   # Aggregation-based overrides (applied AFTER field-name matching).
   # If the aggregation is COUNT or COUNTD, use this format regardless of field name.
@@ -57,11 +60,21 @@ kpi:
 
 # ── Layout ───────────────────────────────────────────────────────────
 layout:
-  # Dashboard dimensions in pixels.
+  # Dashboard sizing mode: "range" (default) or "fixed".
+  # "range" uses min/max bounds so the dashboard adapts to different screen sizes.
+  sizing_mode: "range"
+
+  # Range dimensions (used when sizing_mode is "range").
+  min_width: 1200
+  min_height: 600
+  max_width: 1700
+  max_height: 1000
+
+  # Fixed dimensions (used when sizing_mode is "fixed").
   width: 1200
   height: 800
 
-  # Background color for the dashboard canvas.
+  # Background color applied to the entire dashboard (all zones).
   background_color: "#e6e6e6"
 
   # Card (chart/KPI) background color.
@@ -81,6 +94,11 @@ layout:
     background_color: "#192f3e"
     font_color: "#ffffff"
     max_filters: 3
+    # How filters apply to worksheets:
+    #   all — every worksheet on the dashboard (default, truly global)
+    #   allUsingRelatedDatasource — all sheets sharing the data source
+    #   selected — only explicitly selected worksheets
+    apply_mode: "all"
 
   # Gap between cards (inner margin, pixels).
   card_margin: 4
@@ -97,6 +115,10 @@ layout:
 charts:
   # Maximum number of charts (including KPIs) per dashboard.
   max_charts: 9
+
+  # When true, if there are empty chart slots in the template after
+  # deduplication, fill them with the next-strongest signal charts.
+  fill_available_space: true
 
   # Maximum categories before applying Top-N filter on bar charts.
   bar_top_n: 10

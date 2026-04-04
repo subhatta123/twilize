@@ -606,6 +606,7 @@ def _swap_text_to_filter(
     field_registry: Any,
     editor: Any,
     id_fn: Callable[[], int],
+    rules: dict[str, Any] | None = None,
 ) -> None:
     """Replace the filter placeholder text zone with actual filter zones.
 
@@ -651,6 +652,13 @@ def _swap_text_to_filter(
     fw = 98666 // n if n else 98666
     base_y = int(parent.get("y", "8750"))
 
+    # Determine filter apply mode from rules (default: "all" for truly global)
+    apply_mode = "all"
+    if rules:
+        apply_mode = (rules.get("layout", {})
+                      .get("filters", {})
+                      .get("apply_mode", "all"))
+
     for fi, (field_name, resolved) in enumerate(valid_filters):
         fz = etree.SubElement(parent, "zone")
         fz.set("id", str(id_fn()))
@@ -658,7 +666,7 @@ def _swap_text_to_filter(
         fz.set("name", filter_worksheet)
         fz.set("mode", "dropdown")
         fz.set("show-title", "true")
-        fz.set("apply-to-worksheets", "allUsingRelatedDatasource")
+        fz.set("apply-to-worksheets", apply_mode)
         fz.set("x", str(667 + fi * fw))
         fz.set("y", str(base_y))
         fz.set("w", str(fw))
@@ -851,6 +859,7 @@ def build_c3_zones(
                 _swap_text_to_filter(
                     zone, filters, filter_worksheet,
                     field_registry, editor, id_fn,
+                    rules=rules,
                 )
             continue
 

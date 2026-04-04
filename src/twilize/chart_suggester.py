@@ -36,6 +36,7 @@ class ChartSuggestion:
     top_n: dict | None = field(default=None)  # {"field": ..., "n": 10, "by": "SUM(Sales)"}
     sort_descending: str = ""  # e.g. "SUM(Sales)" — adds descending shelf sort
     text_format: dict | None = field(default=None)  # {"AVG(Margin)": "0%"}
+    label_runs: list[dict] | None = field(default=None)  # Rich-text label runs for KPI cards
 
 
 @dataclass
@@ -399,10 +400,56 @@ def suggest_charts(
             ))
         ]
 
+    # Save the full ranked list before dedup for space-filling later
+    all_ranked = list(suggestions)
+
     # --- Best practice: deduplicate chart types ---
     # Only one chart per non-KPI type to maximise dashboard variety
     suggestions = deduplicate_charts(suggestions, max_per_type=1)
     suggestions = suggestions[:max_charts]
+
+    # --- Fill available space: if template has empty slots, add more charts ---
+    # When fill_available_space is enabled, check if the number of non-KPI
+    # charts is less than the template capacity.  If so, pull in additional
+    # unique charts from the full ranked list (before dedup) to fill the gap
+    # with the next-strongest signal.
+    fill_space = (rules or {}).get("charts", {}).get("fill_available_space", False)
+    if fill_space:
+        n_kpis = sum(1 for s in suggestions if s.chart_type == "Text")
+        n_charts = len(suggestions) - n_kpis
+        # Template capacity: 4 slots for C2/C3, 3 for C4/C5
+        slot_capacity = 4 if n_charts > 3 else 3
+        # After initial dedup we may have bumped down to 3; re-check with 4
+        if n_charts <= 3:
+            slot_capacity = 4  # optimistically target the larger template
+        gap = slot_capacity - n_charts
+        if gap > 0:
+            # Build set of existing chart signatures to avoid true duplicates
+            existing_sigs = set()
+            for s in suggestions:
+                sig = frozenset(
+                    (sh.field_name, sh.shelf, sh.aggregation) for sh in s.shelves
+                )
+                existing_sigs.add(sig)
+            # Walk the full ranked list and pick novel non-KPI charts
+            for candidate in all_ranked:
+                if gap <= 0:
+                    break
+                if candidate.chart_type == "Text":
+                    continue
+                sig = frozenset(
+                    (sh.field_name, sh.shelf, sh.aggregation)
+                    for sh in candidate.shelves
+                )
+                if sig not in existing_sigs:
+                    suggestions.append(candidate)
+                    existing_sigs.add(sig)
+                    gap -= 1
+                    logger.info(
+                        "Fill space: added '%s' (%s, score=%d)",
+                        candidate.title, candidate.chart_type, candidate.priority,
+                    )
+            suggestions = suggestions[:max_charts]
 
     # Determine layout
     n = len(suggestions)
@@ -621,14 +668,14 @@ def _is_population_field(field_name: str) -> bool:
 def _smart_number_format(field_name: str, aggregation: str) -> str:
     """Choose a Tableau number format for KPI values.
 
-    Uses compact formats so values fit in narrow KPI cards:
-    - Rate/percentage fields → ``0%`` (0.156 → 16%)
-    - Currency fields → ``$#,##0,K`` (457753 → $458K)
-    - Count/quantity fields → ``#,##0`` (7571 → 7,571)
-    - Other fields → ``#,##0,K`` (457753 → 458K)
+    Always uses 2 decimal places (no K/M abbreviation):
+    - Rate/percentage fields → ``0.00%``
+    - Currency fields → ``$#,##0.00``
+    - Count/quantity fields → ``#,##0``
+    - Other fields → ``#,##0.00``
     """
     if _is_rate_field(field_name):
-        return "0%"  # 0.156 → 16% (0 decimal places)
+        return "0.00%"
 
     lower = field_name.lower()
 
@@ -636,17 +683,17 @@ def _smart_number_format(field_name: str, aggregation: str) -> str:
     _COUNT_KW = {"quantity", "count", "number", "num", "qty", "units",
                  "items", "orders", "transactions"}
     if any(kw in lower for kw in _COUNT_KW) or aggregation in ("COUNT", "COUNTD"):
-        return "#,##0"  # 7571 → 7,571
+        return "#,##0"
 
-    # Currency fields get abbreviated with $ prefix
+    # Currency fields — whole dollars
     _CURRENCY_KW = {"sales", "revenue", "price", "cost", "profit", "amount",
                     "income", "expense", "margin", "fee", "payment", "budget",
                     "spend", "earning"}
     if any(kw in lower for kw in _CURRENCY_KW):
-        return "$#,##0,K"  # 457753 → $458K
+        return "$#,##0"
 
-    # Default: abbreviated with K suffix for large numbers
-    return "#,##0,K"  # 457753 → 458K
+    # Default: integer with commas
+    return "#,##0"
 
 
 def _kpi_title(aggregation: str, field_name: str) -> str:

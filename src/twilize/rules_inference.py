@@ -106,7 +106,7 @@ def _infer_field_format(
         return fmt, agg
 
     if has_percent:
-        fmt = "0.0%"
+        fmt = "0.00%"
         agg = "AVG"
         return fmt, agg
 
@@ -119,7 +119,7 @@ def _infer_field_format(
 
         # All values between 0 and 1 (exclusive) → likely a rate/ratio
         if max_val < 1.0 and min_val >= 0:
-            fmt = "0.0%"
+            fmt = "0.00%"
             agg = "AVG"
             return fmt, agg
 
@@ -130,22 +130,15 @@ def _infer_field_format(
             agg = "SUM"
             return fmt, agg
 
-        # Large numbers (>10K) → abbreviate
+        # Large numbers (>10K) — full number with 2 decimals (no abbreviation)
         if median_val > 10000:
-            fmt = "#,##0,K"
+            fmt = "#,##0.00"
             agg = "SUM"
             return fmt, agg
 
-        # Medium numbers with decimals
+        # Medium numbers with decimals — always cap at 2 decimal places
         if has_decimals:
-            # Count typical decimal places
-            dec_places = _typical_decimal_places(parsed)
-            if dec_places <= 1:
-                fmt = "#,##0.0"
-            elif dec_places == 2:
-                fmt = "#,##0.00"
-            else:
-                fmt = "#,##0.00"
+            fmt = "#,##0.00"
             agg = "AVG" if median_val < 100 else "SUM"
             return fmt, agg
 
@@ -159,9 +152,9 @@ def _infer_field_format(
     from twilize.chart_suggester import smart_aggregation, _is_rate_field, _is_currency_field
     agg = smart_aggregation(field_name)
     if _is_rate_field(field_name):
-        fmt = "0.0%"
+        fmt = "0.00%"
     elif _is_currency_field(field_name):
-        fmt = "$#,##0,K"
+        fmt = "$#,##0"
     else:
         fmt = "#,##0"
 
@@ -186,19 +179,7 @@ def _parse_numeric_samples(samples: list[str]) -> list[float]:
 
 
 def _currency_format(values: list[float], prefix: str = "$") -> str:
-    """Choose a currency format based on value magnitude."""
-    if not values:
-        return f"{prefix}#,##0"
-    abs_vals = [abs(v) for v in values if v != 0]
-    if not abs_vals:
-        return f"{prefix}#,##0"
-    median = sorted(abs_vals)[len(abs_vals) // 2]
-    if median >= 1_000_000:
-        return f"{prefix}#,##0,,M"  # millions
-    if median >= 10_000:
-        return f"{prefix}#,##0,K"  # thousands
-    if any(v != int(v) for v in values):
-        return f"{prefix}#,##0.00"  # cents
+    """Choose a currency format — whole dollars, no abbreviation."""
     return f"{prefix}#,##0"
 
 
@@ -219,6 +200,27 @@ def _typical_decimal_places(values: list[float]) -> int:
     return Counter(dec_counts).most_common(1)[0][0]
 
 
+def _cap_decimal_places(fmt: str, max_dp: int) -> str:
+    """Truncate decimal places in a Tableau number format string to *max_dp*.
+
+    Examples (max_dp=2):
+      "#,##0.0000" → "#,##0.00"
+      "0.000%"     → "0.00%"
+      "$#,##0.00"  → "$#,##0.00" (already 2 decimals, unchanged)
+    """
+    import re
+    # Match the decimal-point-followed-by-zeros (and optional trailing chars like %)
+    m = re.search(r"(\.)([0#]+)", fmt)
+    if m and len(m.group(2)) > max_dp:
+        trimmed = m.group(2)[:max_dp] if max_dp > 0 else ""
+        if trimmed:
+            fmt = fmt[: m.start()] + "." + trimmed + fmt[m.end():]
+        else:
+            # Remove the decimal point entirely
+            fmt = fmt[: m.start()] + fmt[m.end():]
+    return fmt
+
+
 def infer_kpi_number_format(
     field_name: str,
     aggregation: str,
@@ -232,29 +234,28 @@ def infer_kpi_number_format(
       3. ``rules['_field_formats'][field_name]`` — data-inferred format
       4. ``rules['kpi']['default_format']`` — fallback
 
-    YAML keyword rules take precedence over data inference because they
-    represent intentional admin/user configuration (e.g. "sales → $#,##0,K").
-    Data inference is a best-guess that can be wrong when values lack
-    currency symbols or have ambiguous decimal patterns.
+    The final format is capped to ``rules['kpi']['max_decimal_places']``
+    (default 2) so KPI values never show excessive decimals.
     """
     from twilize.dashboard_rules import kpi_number_format
 
     # Check YAML keyword rules first (includes aggregation overrides)
     kpi = rules.get("kpi", {})
     default_fmt = kpi.get("default_format", "#,##0")
+    max_dp = kpi.get("max_decimal_places", 2)
 
     yaml_fmt = kpi_number_format(field_name, aggregation, rules)
     if yaml_fmt != default_fmt:
         # YAML had a specific keyword or aggregation match — use it
-        return yaml_fmt
+        return _cap_decimal_places(yaml_fmt, max_dp)
 
     # Fall back to data-inferred formats
     field_fmts = rules.get("_field_formats", {})
     if field_name in field_fmts:
-        return field_fmts[field_name]
+        return _cap_decimal_places(field_fmts[field_name], max_dp)
 
     # No specific match anywhere — use YAML default
-    return default_fmt
+    return _cap_decimal_places(default_fmt, max_dp)
 
 
 def infer_aggregation(

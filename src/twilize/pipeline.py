@@ -96,7 +96,13 @@ def build_dashboard_from_csv(
     raw_schema = infer_csv_schema(csv_path, sample_rows=sample_rows)
     classified = classify_columns(raw_schema)
 
-    # Step 2b: Auto-infer formatting rules from data characteristics.
+    # Step 2b: Apply Knowledge Base best practices to rules.
+    # KB recommendations (font sizes, layout, formatting) are merged into
+    # rules so they influence all downstream chart building decisions.
+    from twilize.knowledge_base import apply_blueprint_to_rules
+    rules = apply_blueprint_to_rules(rules)
+
+    # Step 2c: Auto-infer formatting rules from data characteristics.
     # This analyzes actual values (currency symbols, value ranges, decimals)
     # and merges inferred formats on top of YAML defaults — making the system
     # work with ANY dataset, not just sales/retail.
@@ -157,6 +163,13 @@ def build_dashboard_from_csv(
         col_el.set("default-format", fmt)
         logger.info("Auto-format: %s → %s (agg=%s)", bare_name, fmt, agg)
 
+    # Step 6c: Create enhanced KPI calculated fields.
+    # KB best practice: KPI cards show pre-formatted values as string calc
+    # fields, bypassing Tableau's unreliable text-format for programmatic TWBs.
+    # When temporal data is available, also create CY/PY/change fields for
+    # year-over-year comparison indicators.
+    _prepare_enhanced_kpis(editor, suggestion, classified, rules)
+
     # Step 7: Create worksheets and configure charts
     worksheet_names = []
     used_names: set[str] = set()
@@ -187,6 +200,9 @@ def build_dashboard_from_csv(
             chart_kwargs["sort_descending"] = chart.sort_descending
         if chart.text_format:
             chart_kwargs["text_format"] = chart.text_format
+        # Pass through label_runs for enhanced KPI display
+        if chart.label_runs:
+            chart_kwargs["label_runs"] = chart.label_runs
         try:
             editor.configure_chart(ws_name, **chart_kwargs)
         except Exception as exc:
@@ -259,6 +275,122 @@ def build_dashboard_from_csv(
         f"Measures: {len(classified.measures)}\n"
         f"  {result}"
     )
+
+
+def _prepare_enhanced_kpis(
+    editor: TWBEditor,
+    suggestion: DashboardSuggestion,
+    classified: ClassifiedSchema,
+    rules: dict,
+) -> None:
+    """Create calculated fields for enhanced KPI cards.
+
+    KB best practice: KPI values are pre-formatted as string calculated fields
+    so they display correctly regardless of Tableau's text-format behavior.
+    The formatted string calc is placed directly on the label shelf, replacing
+    the raw numeric measure.
+
+    When temporal data is available, also creates CY/PY/change fields for
+    year-over-year comparison indicators (like "▲ 20.4% vs PY").
+    When no temporal data is available, creates only the value display field.
+    """
+    from twilize.knowledge_base import (
+        kpi_value_formula,
+        kpi_cy_formula,
+        kpi_py_formula,
+        kpi_change_formula,
+    )
+    from twilize.rules_inference import infer_kpi_number_format, infer_aggregation
+
+    has_temporal = bool(classified.temporal)
+    date_field = classified.temporal[0].spec.name if has_temporal else ""
+
+    for chart in suggestion.charts:
+        if chart.chart_type != "Text":
+            continue
+
+        # Extract the measure name and aggregation from the shelf assignment
+        label_shelf = next(
+            (sh for sh in chart.shelves if sh.shelf == "label"), None
+        )
+        if not label_shelf:
+            continue
+
+        measure_name = label_shelf.field_name
+        agg = label_shelf.aggregation or infer_aggregation(measure_name, rules)
+        fmt_str = infer_kpi_number_format(measure_name, agg, rules)
+
+        # --- Build the full KPI display formula as ONE string calc field ---
+        # This produces a multi-line string like:
+        #   SALES
+        #   ▲ 20.4% vs PY
+        #   $457.8K
+        # Or without temporal data:
+        #   SALES
+        #   $457.8K
+        val_expr = kpi_value_formula(measure_name, fmt_str, agg)
+        display_name = measure_name.upper()
+
+        if has_temporal:
+            # Create CY and PY helper calc fields first
+            cy_name = f"_kpi_{measure_name}_cy"
+            py_name = f"_kpi_{measure_name}_py"
+            try:
+                editor.add_calculated_field(
+                    field_name=cy_name,
+                    formula=kpi_cy_formula(measure_name, date_field),
+                    datatype="real",
+                )
+                editor.add_calculated_field(
+                    field_name=py_name,
+                    formula=kpi_py_formula(measure_name, date_field),
+                    datatype="real",
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Failed to create CY/PY calcs for '%s': %s — "
+                    "falling back to simple KPI",
+                    measure_name, exc,
+                )
+                has_temporal = False  # Fall back for this measure
+
+        if has_temporal:
+            # Build change expression inline (references CY/PY calc fields)
+            chg_expr = kpi_change_formula(measure_name, agg)
+            # Full KPI formula: TITLE + optional(CHANGE " vs PY") + VALUE
+            # The change line is only shown when PY data exists (chg_expr is non-empty)
+            full_formula = (
+                f"'{display_name}' + "
+                f"IF LEN({chg_expr}) > 0 THEN CHR(10) + ({chg_expr}) + ' vs PY' ELSE '' END + "
+                f"CHR(10) + ({val_expr})"
+            )
+        else:
+            # Simple KPI: TITLE + newline + VALUE
+            full_formula = (
+                f"'{display_name}' + CHR(10) + "
+                f"({val_expr})"
+            )
+
+        kpi_field_name = f"_kpi_{measure_name}"
+        try:
+            editor.add_calculated_field(
+                field_name=kpi_field_name,
+                formula=full_formula,
+                datatype="string",
+            )
+            logger.info("Created KPI display calc: %s", kpi_field_name)
+        except Exception as exc:
+            logger.warning("Failed to create KPI calc '%s': %s", kpi_field_name, exc)
+            continue
+
+        # Replace the label shelf with the KPI display calc field.
+        # The string calc already contains the formatted value, so no
+        # aggregation wrapper is needed (it's already aggregate internally).
+        label_shelf.field_name = kpi_field_name
+        label_shelf.aggregation = ""  # String calc, not wrapped in SUM/AVG
+
+        # Clear text_format since the value is now pre-formatted
+        chart.text_format = None
 
 
 def _safe_worksheet_name(title: str, index: int, used: set[str] | None = None) -> str:
@@ -524,6 +656,10 @@ def _build_dashboard_from_classified(
     if not theme:
         theme = _rules_theme(rules)
 
+    # Apply Knowledge Base best practices to rules
+    from twilize.knowledge_base import apply_blueprint_to_rules
+    rules = apply_blueprint_to_rules(rules)
+
     # Auto-infer formatting rules from data characteristics
     from twilize.rules_inference import infer_rules_from_schema, infer_kpi_number_format, infer_aggregation
     rules = infer_rules_from_schema(classified, rules)
@@ -556,6 +692,9 @@ def _build_dashboard_from_classified(
         col_el.set("default-format", fmt)
         logger.info("Auto-format: %s → %s (agg=%s)", bare_name, fmt, agg)
 
+    # Create enhanced KPI calculated fields
+    _prepare_enhanced_kpis(editor, suggestion, classified, rules)
+
     # Create worksheets
     worksheet_names = []
     used_names: set[str] = set()
@@ -582,6 +721,8 @@ def _build_dashboard_from_classified(
             chart_kwargs["sort_descending"] = chart.sort_descending
         if chart.text_format:
             chart_kwargs["text_format"] = chart.text_format
+        if chart.label_runs:
+            chart_kwargs["label_runs"] = chart.label_runs
         try:
             editor.configure_chart(ws_name, **chart_kwargs)
         except Exception as exc:

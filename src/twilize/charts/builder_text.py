@@ -83,6 +83,11 @@ class TextChartBuilder(BaseChartBuilder):
             None,
             self.measure_values,
         )
+        # Include label_runs field references so they get datasource-dependencies
+        if self.label_runs:
+            for run in self.label_runs:
+                if "field" in run:
+                    all_exprs.append(run["field"])
         instances = self._parse_and_prepare_instances(all_exprs, self.filters)
         self._setup_datasource_dependencies(view, ds_name, instances, all_exprs)
 
@@ -165,52 +170,92 @@ class TextChartBuilder(BaseChartBuilder):
         if self.filters:
             self._add_filters(view, instances, self.filters)
 
-        # Apply text formatting (e.g. percentage, currency) to KPI values
+        # Apply text formatting (e.g. percentage, currency) to KPI values.
+        # Format is applied at FOUR levels for maximum Tableau compatibility:
+        #   1. Main datasource column default-format (MOST RELIABLE — Tableau
+        #      always respects this regardless of view-level style rules)
+        #   2. Table-level cell style-rule (merged into existing rule)
+        #   3. Pane-level cell style-rule (what Tableau Desktop writes)
+        #   4. Column default-format in datasource-dependencies (view-local)
         if self.text_format:
-            from .builder_basic import _get_or_create_table_style
+            from .helpers import _get_or_create_table_style
             table_style = _get_or_create_table_style(table)
-            cell_rule = etree.SubElement(table_style, "style-rule")
-            cell_rule.set("element", "cell")
 
-            # When using Measure Values, the display field is [Multiple Values],
-            # not the individual measure fields.  Apply format there so Tableau
-            # actually renders the abbreviated number (e.g. $458K instead of ########).
+            # Find the existing table-level cell style-rule
+            table_cell_rule = None
+            for sr in table_style.findall("style-rule"):
+                if sr.get("element") == "cell":
+                    table_cell_rule = sr
+                    break
+            if table_cell_rule is None:
+                table_cell_rule = etree.SubElement(table_style, "style-rule")
+                table_cell_rule.set("element", "cell")
+
+            # Find or create pane-level cell style-rule
+            pane_style = pane.find("style")
+            if pane_style is None:
+                pane_style = etree.SubElement(pane, "style")
+            pane_cell_rule = None
+            for sr in pane_style.findall("style-rule"):
+                if sr.get("element") == "cell":
+                    pane_cell_rule = sr
+                    break
+            if pane_cell_rule is None:
+                pane_cell_rule = etree.SubElement(pane_style, "style-rule")
+                pane_cell_rule.set("element", "cell")
+
+            # When using Measure Values, the display field is [Multiple Values]
             if self.measure_values:
-                # Use the first format string — all KPI measures share it in MV mode
                 first_fmt = next(iter(self.text_format.values()))
                 mv_ref = f"[{ds_name}].[Multiple Values]"
-                fmt = etree.SubElement(cell_rule, "format")
-                fmt.set("attr", "text-format")
-                fmt.set("field", mv_ref)
-                fmt.set("value", first_fmt)
+                for target_rule in (table_cell_rule, pane_cell_rule):
+                    fmt = etree.SubElement(target_rule, "format")
+                    fmt.set("attr", "text-format")
+                    fmt.set("field", mv_ref)
+                    fmt.set("value", first_fmt)
                 logger.info("Applied text-format to [Multiple Values]: %s", first_fmt)
 
             for field_expr, fmt_str in self.text_format.items():
                 ci = instances.get(field_expr)
-                if ci:
-                    full_ref = self.field_registry.resolve_full_reference(ci.instance_name)
-                    fmt = etree.SubElement(cell_rule, "format")
-                    fmt.set("attr", "text-format")
-                    fmt.set("field", full_ref)
-                    fmt.set("value", fmt_str)
-                    logger.info("Applied text-format: %s → %s", field_expr, fmt_str)
-                else:
-                    # Fallback: try partial match against registered instances
-                    matched = False
+                if not ci:
+                    # Fallback: try partial match
                     for key, inst in instances.items():
                         if field_expr in key or key in field_expr:
-                            full_ref = self.field_registry.resolve_full_reference(inst.instance_name)
-                            fmt = etree.SubElement(cell_rule, "format")
-                            fmt.set("attr", "text-format")
-                            fmt.set("field", full_ref)
-                            fmt.set("value", fmt_str)
-                            logger.info("Applied text-format (partial match): %s → %s (via %s)", field_expr, fmt_str, key)
-                            matched = True
+                            ci = inst
                             break
-                    if not matched:
-                        logger.warning(
-                            "text_format: field '%s' not found in instances %s — format '%s' not applied",
-                            field_expr, list(instances.keys()), fmt_str,
-                        )
+                if ci:
+                    full_ref = self.field_registry.resolve_full_reference(ci.instance_name)
+                    # Apply at both table and pane level
+                    for target_rule in (table_cell_rule, pane_cell_rule):
+                        fmt = etree.SubElement(target_rule, "format")
+                        fmt.set("attr", "text-format")
+                        fmt.set("field", full_ref)
+                        fmt.set("value", fmt_str)
+                    # Set default-format on the column in datasource-dependencies
+                    ds_deps = view.find(f"datasource-dependencies[@datasource='{ds_name}']")
+                    if ds_deps is not None:
+                        col_name = ci.column_local_name if ci.column_local_name.startswith("[") else f"[{ci.column_local_name}]"
+                        for col_el in ds_deps.findall("column"):
+                            if col_el.get("name") == col_name:
+                                col_el.set("default-format", fmt_str)
+                                break
+                    # LEVEL 1 (most reliable): Set default-format on the MAIN
+                    # datasource column definition.  Tableau reads this first and
+                    # it applies everywhere the field appears in the workbook.
+                    main_ds = self.editor._datasource
+                    if main_ds is not None:
+                        col_name_bare = ci.column_local_name.strip("[]")
+                        for col_el in main_ds.findall(".//column"):
+                            el_name = (col_el.get("caption") or col_el.get("name", "")).strip("[]")
+                            if el_name == col_name_bare:
+                                col_el.set("default-format", fmt_str)
+                                logger.info("Set main datasource default-format: %s → %s", el_name, fmt_str)
+                                break
+                    logger.info("Applied text-format (4 levels): %s → %s", field_expr, fmt_str)
+                else:
+                    logger.warning(
+                        "text_format: field '%s' not found in instances %s — format '%s' not applied",
+                        field_expr, list(instances.keys()), fmt_str,
+                    )
 
         return f"Configured worksheet '{self.worksheet_name}' as Text chart"

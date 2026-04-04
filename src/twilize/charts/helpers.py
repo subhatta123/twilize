@@ -88,38 +88,29 @@ def setup_table_style(table: etree._Element, mark_type: str) -> None:
     table_style = _get_or_create_table_style(table)
 
     if mark_type == "Text":
-        # BAN (Big Ass Number) styling for KPI text charts
+        # KPI "Big Number" styling — uses Knowledge Base recommendations:
+        # 22pt bold (within KB's 20-24pt range), centered, Tableau Book font.
+        from twilize.knowledge_base import get_kpi_style_attrs, get_kpi_header_attrs, get_kpi_label_attrs
+
         cell_rule = etree.SubElement(table_style, "style-rule")
         cell_rule.set("element", "cell")
-        for attr, val in (
-            ("text-align", "center"),
-            ("font-weight", "bold"),
-            ("font-size", "28"),
-            ("font-family", "Tableau Book"),
-        ):
+        for attr, val in get_kpi_style_attrs():
             fmt = etree.SubElement(cell_rule, "format")
             fmt.set("attr", attr)
             fmt.set("value", val)
 
-        # Set header width so KPI values don't overflow as "########"
+        # Header width sized to prevent "####" overflow at 22pt bold.
+        # KB: "Remove gridlines and headers for a clean card"
         header_rule = etree.SubElement(table_style, "style-rule")
         header_rule.set("element", "header")
-        for attr, val in (
-            ("width", "200"),
-            ("minwidth", "120"),
-        ):
+        for attr, val in get_kpi_header_attrs():
             fmt = etree.SubElement(header_rule, "format")
             fmt.set("attr", attr)
             fmt.set("value", val)
 
         label_rule = etree.SubElement(table_style, "style-rule")
         label_rule.set("element", "label")
-        for attr, val in (
-            ("text-align", "center"),
-            ("font-size", "14"),
-            ("font-family", "Tableau Book"),
-            ("color", "#666666"),
-        ):
+        for attr, val in get_kpi_label_attrs():
             fmt = etree.SubElement(label_rule, "format")
             fmt.set("attr", attr)
             fmt.set("value", val)
@@ -577,37 +568,27 @@ def apply_measure_values(
     if table_style is None:
         table_style = etree.SubElement(table, "style")
 
+    # KPI styling for Measure Values mode — uses Knowledge Base recommendations
+    from twilize.knowledge_base import get_kpi_style_attrs, get_kpi_header_attrs, get_kpi_label_attrs
+
     cell_rule = etree.SubElement(table_style, "style-rule")
     cell_rule.set("element", "cell")
-    for attr, val in (
-        ("text-align", "center"),
-        ("font-weight", "bold"),
-        ("font-size", "28"),          # BAN: Big Ass Number — large, prominent
-        ("font-family", "Tableau Book"),
-    ):
+    for attr, val in get_kpi_style_attrs():
         fmt = etree.SubElement(cell_rule, "format")
         fmt.set("attr", attr)
         fmt.set("value", val)
 
-    # Set header width so KPI values don't overflow as "########"
+    # Header width sized for 22pt bold formatted values (prevents ####)
     header_rule = etree.SubElement(table_style, "style-rule")
     header_rule.set("element", "header")
-    for attr, val in (
-        ("width", "200"),
-        ("minwidth", "120"),
-    ):
+    for attr, val in get_kpi_header_attrs():
         fmt = etree.SubElement(header_rule, "format")
         fmt.set("attr", attr)
         fmt.set("value", val)
 
     label_rule = etree.SubElement(table_style, "style-rule")
     label_rule.set("element", "label")
-    for attr, val in (
-        ("text-align", "center"),
-        ("font-size", "14"),           # Subtitle label below the number
-        ("font-family", "Tableau Book"),
-        ("color", "#666666"),     # Muted gray for context
-    ):
+    for attr, val in get_kpi_label_attrs():
         fmt = etree.SubElement(label_rule, "format")
         fmt.set("attr", attr)
         fmt.set("value", val)

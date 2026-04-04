@@ -110,18 +110,18 @@ class DashboardsMixin:
         if isinstance(layout, dict) and layout.get("_background_color"):
             bg_color = layout["_background_color"]
         db_style = etree.SubElement(db, "style")
-        style_rule = etree.SubElement(db_style, "style-rule")
-        style_rule.set("element", "table")
-        fmt = etree.SubElement(style_rule, "format")
-        fmt.set("attr", "background-color")
-        fmt.set("value", bg_color)
-
+        # Apply background to the dashboard table
+        style_rule_table = etree.SubElement(db_style, "style-rule")
+        style_rule_table.set("element", "table")
+        fmt_table = etree.SubElement(style_rule_table, "format")
+        fmt_table.set("attr", "background-color")
+        fmt_table.set("value", bg_color)
         size_el = etree.SubElement(db, "size")
-        size_el.set("maxheight", str(height))
-        size_el.set("maxwidth", str(width))
-        size_el.set("minheight", str(height))
-        size_el.set("minwidth", str(width))
-        size_el.set("sizing-mode", "fixed")
+        size_el.set("maxheight", "1000")
+        size_el.set("maxwidth", "1700")
+        size_el.set("minheight", "600")
+        size_el.set("minwidth", "1200")
+        size_el.set("sizing-mode", "range")
 
         zones = etree.SubElement(db, "zones")
 
