@@ -96,6 +96,18 @@ def main():
     server.settings.host = "0.0.0.0"
     server.settings.port = port
 
+    # MCP SDK enables DNS rebinding protection by default and only allows
+    # localhost. On a public cloud deployment that rejects every request with
+    # 421 "Invalid Host header". Honor MCP_ALLOWED_HOSTS / MCP_ALLOWED_ORIGINS
+    # if provided, otherwise allow all (the deploy is already public).
+    sec = server.settings.transport_security
+    allowed_hosts = os.environ.get("MCP_ALLOWED_HOSTS", "*")
+    allowed_origins = os.environ.get("MCP_ALLOWED_ORIGINS", "*")
+    sec.allowed_hosts = [h.strip() for h in allowed_hosts.split(",") if h.strip()]
+    sec.allowed_origins = [o.strip() for o in allowed_origins.split(",") if o.strip()]
+    if sec.allowed_hosts == ["*"] and sec.allowed_origins == ["*"]:
+        sec.enable_dns_rebinding_protection = False
+
     if transport == "streamable-http":
         app = server.streamable_http_app()
     else:
