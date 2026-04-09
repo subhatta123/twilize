@@ -79,12 +79,36 @@ def main():
     if transport == "http":
         transport = "streamable-http"
 
-    if transport in ("streamable-http", "sse"):
-        port = int(os.environ.get("PORT") or os.environ.get("MCP_PORT") or 8000)
-        server.settings.host = "0.0.0.0"
-        server.settings.port = port
+    if transport == "stdio":
+        server.run(transport="stdio")
+        return
 
-    server.run(transport=transport)
+    if transport not in ("streamable-http", "sse"):
+        raise ValueError(f"Unsupported MCP_TRANSPORT: {transport}")
+
+    # HTTP / SSE: run uvicorn ourselves so we can enable proxy_headers, which
+    # is required when fronted by Railway / Fly / Render / Cloudflare. Without
+    # this, FastMCP's redirects use http:// instead of https:// and the
+    # forwarded Host header gets rejected with "Invalid Host header".
+    import uvicorn
+
+    port = int(os.environ.get("PORT") or os.environ.get("MCP_PORT") or 8000)
+    server.settings.host = "0.0.0.0"
+    server.settings.port = port
+
+    if transport == "streamable-http":
+        app = server.streamable_http_app()
+    else:
+        app = server.sse_app()
+
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=port,
+        proxy_headers=True,
+        forwarded_allow_ips="*",
+        log_level=os.environ.get("MCP_LOG_LEVEL", "info"),
+    )
 
 
 if __name__ == "__main__":
