@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Twilize">
+  <title>Twilize</title>
+  <rect width="512" height="512" rx="96" fill="#ffffff"/>
+  <g fill="#0a2a66" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="800">
+    <text x="256" y="312" font-size="180" text-anchor="middle" letter-spacing="-6">Twilize</text>
+    <circle cx="438" cy="316" r="22"/>
+  </g>
+</svg>

@@ -62,6 +62,55 @@ from .mcp.tools_workbook import (
 )
 
 
+def _wrap_with_api_key_auth(app, valid_keys, open_paths):
+    """Return an ASGI app that 401s requests missing a valid API key.
+
+    Pure ASGI middleware (no Starlette dependency) so it works regardless of
+    what FastMCP returns from streamable_http_app() / sse_app().
+    """
+
+    async def auth_app(scope, receive, send):
+        if scope["type"] != "http":
+            await app(scope, receive, send)
+            return
+
+        path = scope.get("path", "")
+        if path in open_paths:
+            await app(scope, receive, send)
+            return
+
+        provided = None
+        for raw_name, raw_value in scope.get("headers", []):
+            name = raw_name.decode("latin-1").lower()
+            if name == "authorization":
+                value = raw_value.decode("latin-1")
+                if value.lower().startswith("bearer "):
+                    provided = value[7:].strip()
+                    break
+            elif name == "x-api-key":
+                provided = raw_value.decode("latin-1").strip()
+                break
+
+        if provided and provided in valid_keys:
+            await app(scope, receive, send)
+            return
+
+        await send({
+            "type": "http.response.start",
+            "status": 401,
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"www-authenticate", b'Bearer realm="twilize"'),
+            ],
+        })
+        await send({
+            "type": "http.response.body",
+            "body": b'{"error":"unauthorized","detail":"missing or invalid API key"}',
+        })
+
+    return auth_app
+
+
 def main():
     """Run the MCP server.
 
@@ -112,6 +161,19 @@ def main():
         app = server.streamable_http_app()
     else:
         app = server.sse_app()
+
+    # Optional shared-secret auth. Set MCP_API_KEY to require every request
+    # to carry one of:
+    #   Authorization: Bearer <key>
+    #   X-API-Key: <key>
+    # Multiple comma-separated keys are allowed (e.g. one for Smithery, one
+    # for direct clients) so secrets can be rotated without downtime.
+    api_keys_raw = os.environ.get("MCP_API_KEY", "").strip()
+    if api_keys_raw:
+        valid_keys = {k.strip() for k in api_keys_raw.split(",") if k.strip()}
+        # Health check / well-known paths stay open so platforms can probe.
+        open_paths = {"/", "/health", "/healthz", "/.well-known/health"}
+        app = _wrap_with_api_key_auth(app, valid_keys, open_paths)
 
     uvicorn.run(
         app,
