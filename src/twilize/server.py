@@ -1,5 +1,7 @@
 """Compatibility entrypoint for twilize's MCP server."""
 
+import os
+
 from .mcp.app import server
 from .mcp.resources import read_skill, read_skills_index, read_tableau_functions
 from .mcp.tools_layout import generate_layout_json
@@ -61,9 +63,28 @@ from .mcp.tools_workbook import (
 
 
 def main():
-    """Run the MCP server via stdio transport."""
+    """Run the MCP server.
 
-    server.run(transport="stdio")
+    Transport is selected via the ``MCP_TRANSPORT`` env var:
+
+    - ``stdio`` (default): local subprocess transport for Claude Desktop / uvx
+    - ``streamable-http`` / ``http``: hosted remote MCP server (e.g. Railway)
+    - ``sse``: legacy Server-Sent Events transport
+
+    For HTTP/SSE modes the server binds to ``0.0.0.0`` on ``$PORT`` (Railway,
+    Fly.io, Render, etc. all set this) or ``MCP_PORT`` if provided.
+    """
+
+    transport = os.environ.get("MCP_TRANSPORT", "stdio").lower()
+    if transport == "http":
+        transport = "streamable-http"
+
+    if transport in ("streamable-http", "sse"):
+        port = int(os.environ.get("PORT") or os.environ.get("MCP_PORT") or 8000)
+        server.settings.host = "0.0.0.0"
+        server.settings.port = port
+
+    server.run(transport=transport)
 
 
 if __name__ == "__main__":

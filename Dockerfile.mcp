@@ -1,0 +1,34 @@
+# Slim image dedicated to running twilize as a remote (HTTP) MCP server.
+# Used by Railway / Fly.io / Render deployments. The default `Dockerfile`
+# builds the browser extension backend instead — keep them separate so each
+# deployment target stays lean.
+
+FROM python:3.13-slim
+
+WORKDIR /app
+
+# System deps kept minimal — twilize is pure-Python aside from optional drivers.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies first for better layer caching
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy source and install the package
+COPY pyproject.toml README.md ./
+COPY src ./src
+RUN pip install --no-cache-dir .
+
+# Default to streamable-HTTP transport on Railway's $PORT
+ENV MCP_TRANSPORT=streamable-http
+ENV PORT=8000
+EXPOSE 8000
+
+# Healthcheck hits the MCP endpoint root; FastMCP responds with 405/406 for
+# GET which is fine — we just want the TCP socket up.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -fsS -o /dev/null "http://127.0.0.1:${PORT}/mcp" || exit 1
+
+CMD ["python", "-m", "twilize"]
