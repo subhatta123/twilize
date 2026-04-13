@@ -109,6 +109,51 @@ class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin,
 
         return cls(file_path, clear_existing_content=False)
 
+    @classmethod
+    def from_prompt(
+        cls,
+        prompt: str,
+        output_path: str | Path = "output.twb",
+        template_path: str | Path = "",
+        *,
+        apply_theme: bool = True,
+        add_dashboard: bool = True,
+    ) -> "Path":
+        """Create a Tableau workbook from a natural-language *prompt* and save it.
+
+        This is a convenience class-method that parses the prompt and writes a
+        ``.twb`` or ``.twbx`` file.  For finer control, use
+        :func:`twilize.prompt_interpreter.interpret_prompt` to inspect the parsed
+        interpretation before building.
+
+        Args:
+            prompt:        Free-text description, e.g.
+                           ``"Bar chart of Sales by Category, blue, vertical"``.
+            output_path:   Destination file (``.twb`` or ``.twbx``).
+            template_path: Optional base template path (empty = built-in blank).
+            apply_theme:   Apply detected colour palette / theme.
+            add_dashboard: Wrap the worksheet in a dashboard.
+
+        Returns:
+            :class:`pathlib.Path` to the saved file.
+
+        Example::
+
+            from twilize.twb_editor import TWBEditor
+            path = TWBEditor.from_prompt(
+                "Create a dark-themed line chart of Revenue over Month",
+                output_path="revenue.twb",
+            )
+        """
+        from .prompt_interpreter import create_from_prompt
+        return create_from_prompt(
+            prompt,
+            output_path=output_path,
+            template_path=template_path,
+            apply_theme=apply_theme,
+            add_dashboard=add_dashboard,
+        )
+
     # ================================================================
     # Initialization
     # ================================================================

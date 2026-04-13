@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.31.0] - 2026-04-13
+
+### Added
+
+- **`prompt_interpreter` module** — natural-language prompt parsing that detects
+  chart type, colour scheme, layout, and field names from a free-text description
+  without requiring an external LLM.  Key public symbols:
+  - `interpret_prompt(prompt)` → `PromptInterpretation` dataclass
+  - `create_from_prompt(prompt, output_path, ...)` → saves a `.twb` / `.twbx` file
+- **`TWBEditor.from_prompt()` class-method** — convenience entry point that calls
+  `create_from_prompt()` and returns the saved file path.
+- Detects **14 chart types** (Bar, Line, Area, Pie/Donut, Circle/Scatter/Bubble,
+  Square/Heatmap, Map, Text/KPI) from keyword phrases.
+- Detects **22 named colours** (blue, red, green, teal, purple, …) and maps them
+  to hex values applied via `apply_color_palette()`.
+- Detects **4 named palettes** (`tableau10`, `tableau20`, `blue-red`, `green-gold`).
+- Detects **5 named themes** (`dark`, `modern-light`, `corporate-blue`, `minimal`,
+  `vibrant`) applied via `apply_theme_to_editor()`.
+- Detects **4 layout modes** (`vertical`, `horizontal`, `grid-2x2`, `side-by-side`).
+- Heuristic field extraction from quoted strings and capitalised words; unknown
+  fields fall back gracefully to an empty-shelf chart.
+- 60 new unit + integration tests in `tests/test_prompt_interpreter.py`.
+- `PromptInterpretation`, `create_from_prompt`, `interpret_prompt` added to the
+  package's public `__all__` exports.
+
 ## [0.16.0] - 2026-03-19
 
 ### Fixed

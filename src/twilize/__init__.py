@@ -34,6 +34,11 @@ from .pipeline import (  # noqa: E402
 from .schema_inference import infer_schema  # noqa: E402
 from .twb_editor import TWBEditor  # noqa: E402
 from .validator import SchemaValidationResult, TWBValidationError, validate_against_schema  # noqa: E402
+from .prompt_interpreter import (  # noqa: E402
+    PromptInterpretation,
+    create_from_prompt,
+    interpret_prompt,
+)
 
 __all__ = [
     "AnalysisReport",
@@ -57,6 +62,9 @@ __all__ = [
     "get_capability",
     "infer_schema",
     "inspect_target_schema",
+    "interpret_prompt",
+    "create_from_prompt",
+    "PromptInterpretation",
     "list_capabilities",
     "migrate_twb_guided",
     "profile_twb_for_migration",

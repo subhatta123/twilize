@@ -1,6 +1,6 @@
 [project]
 name = "twilize"
-version = "0.30.0"
+version = "0.31.0"
 description = "Tableau Workbook (.twb) generation toolkit and MCP server"
 authors = [{name = "Suddhasheel Bhattacharya", email = "suddhasheel.bhattacharya@gmail.com"}]
 readme = "README.md"
