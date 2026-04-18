@@ -327,6 +327,19 @@ class ConnectionsMixin:
         # Rebuild <column> and <metadata-record> elements from Hyper schema
         self._rebuild_fields_from_hyper(filepath, table_name, tables)
 
+        # Track the hyper file so save() can auto-bundle it into a .twbx
+        # archive at Data/Extracts/<name> (fixes "Could not find the
+        # referenced file" errors when the workbook is saved as .twbx).
+        from pathlib import Path as _Path
+        _hyper_path = _Path(filepath)
+        if _hyper_path.exists() and hasattr(self, "_hyper_files"):
+            self._hyper_files[_hyper_path.name] = _hyper_path
+
+        # Refresh the datasource caption so Tableau's UI does not keep the
+        # stale template caption (e.g. "Sample _ Superstore (Simple)").
+        ds_caption = _hyper_path.stem or "Hyper Extract"
+        self._datasource.set("caption", ds_caption)
+
         self._reinit_fields()
         if tables and len(tables) > 1:
             names = ", ".join(t["name"] for t in tables)

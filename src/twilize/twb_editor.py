@@ -56,6 +56,11 @@ class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin,
         self._twbx_source: Path | None = None
         self._twbx_twb_name: str | None = None
 
+        # Hyper files registered via set_hyper_connection, to auto-bundle
+        # into Data/Extracts/ when save() writes a .twbx. Keyed by the
+        # basename used in the connection's dbname attribute.
+        self._hyper_files: dict[str, Path] = {}
+
         if template_path.suffix.lower() == ".twbx":
             self._twbx_source = template_path
             with zipfile.ZipFile(template_path) as zf:
@@ -721,7 +726,32 @@ class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin,
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         if output_path.suffix.lower() == ".twbx":
-            # Serialize the XML into memory
+            # Collect all hyper files that need to be bundled:
+            # explicit extra_files (from pipelines) + files registered via
+            # set_hyper_connection (from MCP/SDK calls). Deduplicate by
+            # basename so the same file isn't written twice.
+            bundle_files: dict[str, Path] = {}
+            if getattr(self, "_hyper_files", None):
+                for name, fpath in self._hyper_files.items():
+                    if fpath.exists():
+                        bundle_files[name] = fpath
+            if extra_files:
+                for fpath in extra_files:
+                    fp = Path(fpath)
+                    if fp.exists():
+                        bundle_files[fp.name] = fp
+
+            # Rewrite each bundled hyper's dbname in the XML to the relative
+            # archive path so Tableau finds the file after unzipping the .twbx.
+            if bundle_files:
+                bundled_basenames = set(bundle_files)
+                for conn_el in self._datasource.findall(".//connection[@class='hyper']"):
+                    current = conn_el.get("dbname", "")
+                    basename = Path(current).name
+                    if basename in bundled_basenames:
+                        conn_el.set("dbname", f"Data/Extracts/{basename}")
+
+            # Serialize the XML into memory (after dbname rewrite)
             buf = io.BytesIO()
             self.tree.write(buf, xml_declaration=True, encoding="utf-8", pretty_print=False)
             twb_bytes = buf.getvalue()
@@ -732,19 +762,20 @@ class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin,
             with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zout:
                 # Write the updated workbook XML
                 zout.writestr(inner_twb_name, twb_bytes)
-                # Copy bundled extracts / images from the source .twbx if available
+                # Copy bundled extracts / images from the source .twbx if available.
+                # Skip any Data/Extracts/<name> entries that we're about to overwrite
+                # with a newer bundled file — otherwise the stale extract wins.
                 if self._twbx_source and self._twbx_source.exists():
                     with zipfile.ZipFile(self._twbx_source) as zsrc:
                         for info in zsrc.infolist():
-                            if info.filename != self._twbx_twb_name:
-                                zout.writestr(info, zsrc.read(info.filename))
-                # Bundle extra files (e.g. Hyper extracts)
-                if extra_files:
-                    for fpath in extra_files:
-                        fpath = Path(fpath)
-                        if fpath.exists():
-                            arcname = f"Data/Extracts/{fpath.name}"
-                            zout.write(fpath, arcname)
+                            if info.filename == self._twbx_twb_name:
+                                continue
+                            if info.filename in {f"Data/Extracts/{n}" for n in bundle_files}:
+                                continue
+                            zout.writestr(info, zsrc.read(info.filename))
+                # Bundle collected hyper files
+                for name, fpath in bundle_files.items():
+                    zout.write(fpath, f"Data/Extracts/{name}")
         else:
             self.tree.write(
                 str(output_path),

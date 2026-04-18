@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.32.0] - 2026-04-18
+
+### Fixed
+
+- **`.twbx` saved via MCP referenced a missing Hyper extract**: Calling `set_hyper_connection(...)` followed by `save_workbook("out.twbx")` produced a workbook whose `<connection dbname="...">` pointed at the original absolute filesystem path, and the Hyper file was never bundled into the archive. Tableau showed *"Could not find the referenced file 'Data/Extracts/<name>.hyper'. Replace it with another file?"* on open. `TWBEditor.set_hyper_connection()` now registers the Hyper file on the editor (`self._hyper_files`), and `TWBEditor.save()` auto-bundles every registered Hyper into `Data/Extracts/<basename>` when writing a `.twbx`, rewriting any matching `<connection class="hyper" dbname="…">` to the relative archive path at save time. The existing `extra_files=[...]` path used by `csv_to_dashboard` / `hyper_to_dashboard` pipelines continues to work — both sources are merged and de-duplicated by basename.
+- **Stale `Sample _ Superstore (Simple)` datasource caption**: The default empty template ships with a `<datasource caption="Sample _ Superstore (Simple)">` attribute that leaked into every generated workbook, so Tableau's data-source pane and error dialogs still referred to the sample Superstore data even after a Hyper connection had replaced it. `set_hyper_connection()` now refreshes the caption to the stem of the Hyper filename.
+- **Stale extract leaking from `.twbx` template source**: When `open_workbook` loaded a `.twbx`, `save()` copied every non-`.twb` archive entry straight through — so a `Data/Extracts/<X>.hyper` from the original template could survive even after the caller replaced the connection. `save()` now skips any archive entry that matches a basename we're about to bundle, so the newly registered Hyper wins.
+
 ## [0.16.0] - 2026-03-19
 
 ### Fixed
