@@ -373,10 +373,17 @@ def _prepare_enhanced_kpis(
 
         kpi_field_name = f"_kpi_{measure_name}"
         try:
+            # Force dimension/nominal: the formula already embeds SUM(...)
+            # internally and returns a string for Text placement. Without
+            # these overrides, _infer_calculated_field_semantics sees the
+            # SUM tokens and marks it role="measure", which makes Tableau
+            # apply an outer SUM wrapper to a string — invalid ("!").
             editor.add_calculated_field(
                 field_name=kpi_field_name,
                 formula=full_formula,
                 datatype="string",
+                role="dimension",
+                field_type="nominal",
             )
             logger.info("Created KPI display calc: %s", kpi_field_name)
         except Exception as exc:

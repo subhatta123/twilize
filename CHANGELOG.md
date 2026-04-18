@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.33.0] - 2026-04-18
+
+### Fixed
+
+- **KPI display calcs marked invalid in Tableau (`_kpi_Sales (Sum)` with red "!")**: `_prepare_enhanced_kpis` created string-typed calcs whose formulas embed `SUM(...)` internally. `_infer_calculated_field_semantics` saw the aggregate tokens and returned `role="measure"`, so Tableau applied an outer SUM wrapper to a string and flagged the field as invalid. The pipeline now passes `role="dimension"`, `field_type="nominal"` explicitly when adding each KPI display calc.
+- **MCP tool failures silently reported as success**: `_SafeFastMCP.tool` previously caught every exception and *returned* a string `"Error in <tool>: <exc>"`. FastMCP serialises a returned string as a successful result, so callers (including AI agents) could not tell a failure apart from a success — e.g. a "Top 3 Customers by Sales" chart could fail to persist while the agent was told it had been created. Exceptions are now logged and re-raised so FastMCP emits a proper MCP error response. As a side effect, three pre-existing tests in `test_error_handling.py` and `test_reference_lines.py` that expected tools to raise on bad input now pass.
+
 ## [0.32.0] - 2026-04-18
 
 ### Fixed

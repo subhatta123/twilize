@@ -36,7 +36,15 @@ _fm._create_wrapped_model = _patched_create_wrapped
 
 
 class _SafeFastMCP(FastMCP):
-    """FastMCP subclass that wraps every tool function with error handling."""
+    """FastMCP subclass that logs tool exceptions and re-raises them.
+
+    Previously this wrapper swallowed exceptions and *returned* a string like
+    ``"Error in <tool>: <exc>"``. FastMCP serialises that return value as a
+    successful tool result, so MCP clients (and AI agents) could not tell a
+    failure apart from a success — a chart could fail to be created while the
+    agent reported it had succeeded. We now log the traceback and re-raise so
+    FastMCP emits a proper MCP error response.
+    """
 
     def tool(self, *args, **kwargs):
         decorator = super().tool(*args, **kwargs)
@@ -48,7 +56,7 @@ class _SafeFastMCP(FastMCP):
                     return func(*a, **kw)
                 except Exception as exc:
                     _log.error("Tool %s failed: %s", func.__name__, exc, exc_info=True)
-                    return f"Error in {func.__name__}: {exc}"
+                    raise
             return decorator(safe_wrapper)
         return wrapping_decorator
 

@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/servers/main/schema/mcp-server.schema.json",
   "id": "com.twilize.mcp-server",
   "name": "twilize",
-  "version": "0.32.0",
+  "version": "0.33.0",
   "description": "Tableau Workbook (.twb/.twbx) generation MCP server with 47 tools for charts, dashboards, rules engine, and intelligent template selection",
   "author": {
     "name": "Suddhasheel Bhattacharya",
