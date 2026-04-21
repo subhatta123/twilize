@@ -238,6 +238,35 @@ def add_worksheet(worksheet_name: str) -> str:
 
 
 @server.tool()
+def apply_style_reference(
+    image_path: Optional[str] = None,
+    css: Optional[str] = None,
+    html: Optional[str] = None,
+    apply_to: Optional[list[str]] = None,
+) -> dict:
+    """Re-skin existing dashboards from a reference image and/or CSS/HTML.
+
+    Extracts a colour palette + typography + border styling, then rewrites
+    dashboard and zone backgrounds, borders, and worksheet mark text
+    colours to match.
+
+    At least one of ``image_path``, ``css``, or ``html`` is required.
+    ``apply_to`` limits the effect to named dashboards; default is all.
+
+    Returns the extracted StyleReference dict.
+    """
+
+    _snapshot("apply_style_reference")
+    editor = get_editor()
+    return editor.apply_style_reference(
+        image_path=image_path,
+        css=css,
+        html=html,
+        apply_to=apply_to,
+    )
+
+
+@server.tool()
 def configure_chart(
     worksheet_name: str,
     mark_type: str = "Automatic",

@@ -78,6 +78,14 @@ class FieldInfo:
     role: str               # dimension / measure
     field_type: str         # nominal / quantitative / ordinal
     is_calculated: bool = False
+    # True when the calculated field's formula embeds an aggregate function
+    # (SUM/AVG/COUNT/...). Such calcs are user-defined aggregates in Tableau:
+    # placing them on a shelf requires derivation="User" even when the field's
+    # role is "dimension" (e.g. string-typed KPI label calcs). Otherwise
+    # Tableau emits "The calculation '…' can't be applied to a user-defined
+    # aggregate" when the dimension-slot column-instance references an
+    # aggregate formula.
+    is_aggregate: bool = False
 
 
 @dataclass
@@ -115,6 +123,7 @@ class FieldRegistry:
         role: str,
         field_type: str,
         is_calculated: bool = False,
+        is_aggregate: bool = False,
     ) -> None:
         """Register one field and its Tableau metadata in the lookup table."""
         self._fields[display_name] = FieldInfo(
@@ -124,6 +133,7 @@ class FieldRegistry:
             role=role,
             field_type=field_type,
             is_calculated=is_calculated,
+            is_aggregate=is_aggregate,
         )
 
     def unregister(self, display_name: str) -> None:
@@ -195,7 +205,13 @@ class FieldRegistry:
         # Calculated measures use derivation="User" (abbr: usr).
         # Calculated dimensions (boolean, nominal) keep derivation="None" so they
         # are treated as plain dimension values rather than user-aggregated expressions.
-        if fi.is_calculated and fi.role == "measure" and derivation == "None":
+        # EXCEPTION: calculated dimensions whose formula embeds an aggregate
+        # (SUM/AVG/COUNT/...) are user-defined aggregates and must also use
+        # derivation="User" — Tableau rejects them in dimension slots with
+        # "The calculation '…' can't be applied to a user-defined aggregate".
+        if fi.is_calculated and derivation == "None" and (
+            fi.role == "measure" or fi.is_aggregate
+        ):
             derivation = "User"
 
         # Determine type suffix

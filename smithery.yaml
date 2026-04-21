@@ -10,7 +10,7 @@ description: >
   Supports 10+ chart types, dual-axis compositions, recipe charts,
   calculated fields, parameters, dashboard actions, and workbook migration.
 
-version: "0.33.0"
+version: "0.34.0"
 license: AGPL-3.0-or-later
 
 author:

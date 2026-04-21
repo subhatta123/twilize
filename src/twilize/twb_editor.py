@@ -38,6 +38,44 @@ _AGGREGATE_FUNCTION_RE = re.compile(
 )
 
 
+def _set_format(zone_style: etree._Element, attr: str, value: str) -> None:
+    """Set/replace a <format attr="…" value="…"/> child on a zone-style.
+
+    Used by ``apply_style_reference`` to rewrite background/border rules
+    without duplicating existing entries.
+    """
+    for fmt in zone_style.findall("format"):
+        if fmt.get("attr") == attr:
+            fmt.set("value", value)
+            return
+    fmt = etree.SubElement(zone_style, "format")
+    fmt.set("attr", attr)
+    fmt.set("value", value)
+
+
+def _upsert_style_rule_format(
+    style_el: etree._Element,
+    element_name: str,
+    attr: str,
+    value: str,
+) -> None:
+    """Upsert a <style-rule element=X><format attr=Y value=Z/></style-rule>.
+
+    Creates the rule if missing; replaces a same-attr format if present.
+    Shared by dashboard style and pane style rewrites in
+    ``apply_style_reference``.
+    """
+    rule = None
+    for sr in style_el.findall("style-rule"):
+        if sr.get("element") == element_name:
+            rule = sr
+            break
+    if rule is None:
+        rule = etree.SubElement(style_el, "style-rule")
+        rule.set("element", element_name)
+    _set_format(rule, attr, value)
+
+
 class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin,
                 ReferenceLinesMixin, TrendLineMixin, ThemesMixin):
     """lxml-based TWB XML editor."""
@@ -323,6 +361,14 @@ class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin,
         Returns:
             Confirmation message.
         """
+        # Validate every function call in the formula against the official
+        # Tableau function catalog (tableau_all_functions.json). Raises with a
+        # close-match suggestion if an unknown function is used — e.g. CHR →
+        # "Did you mean CHAR?". This blocks typos from producing a .twb with
+        # red-"!" calc fields.
+        from .formula_validator import assert_valid_formula
+        assert_valid_formula(formula, field_name=field_name)
+
         inferred_role, inferred_field_type = self._infer_calculated_field_semantics(
             formula,
             datatype,
@@ -389,7 +435,11 @@ class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin,
             else:
                 self._datasource.append(col)
 
-        # Register in field registry
+        # Register in field registry. is_aggregate flags calcs whose formula
+        # embeds SUM/AVG/COUNT/... so FieldRegistry.parse_expression emits
+        # derivation="User" (user-defined aggregate) when the field is placed
+        # on a shelf, even if role="dimension" (e.g. string KPI label calcs).
+        is_aggregate = bool(_AGGREGATE_FUNCTION_RE.search(resolved_formula))
         self.field_registry.register(
             display_name=field_name,
             local_name=internal_name,
@@ -397,6 +447,7 @@ class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin,
             role=role,
             field_type=field_type,
             is_calculated=True,
+            is_aggregate=is_aggregate,
         )
 
         return f"Added calculated field '{field_name}' = {formula}"
@@ -417,6 +468,134 @@ class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin,
             return "measure", "nominal"
 
         return "dimension", "nominal"
+
+    def apply_style_reference(
+        self,
+        image_path: Optional[str] = None,
+        css: Optional[str] = None,
+        html: Optional[str] = None,
+        apply_to: Optional[list[str]] = None,
+    ) -> dict:
+        """Re-skin existing dashboards from a reference image and/or CSS.
+
+        Extracts palette + typography + border styling via the pure
+        ``style_reference`` module, then mutates the current workbook in
+        place — dashboard `<style>` backgrounds, every zone's `<zone-style>`
+        background / border format rules, and pane-level mark text colours
+        for worksheets inside the targeted dashboards.
+
+        Args:
+            image_path: Path to a reference image (PNG/JPG). Optional.
+            css: Raw CSS string. Optional.
+            html: HTML fragment containing one or more ``<style>`` blocks.
+                Optional.
+            apply_to: Dashboard names to re-style. ``None`` applies to all
+                dashboards in the workbook.
+
+        Returns:
+            The extracted StyleReference dict, for inspection.
+        """
+        from .style_reference import extract_style_reference
+
+        style = extract_style_reference(image_path=image_path, css=css, html=html)
+        self._apply_style_reference_to_workbook(style, apply_to)
+        return style
+
+    def _apply_style_reference_to_workbook(
+        self,
+        style: dict,
+        apply_to: Optional[list[str]],
+    ) -> None:
+        """Apply an already-extracted StyleReference dict onto workbook XML."""
+        colors = style.get("colors", {}) or {}
+        typography = style.get("typography", {}) or {}
+        borders = style.get("borders", {}) or {}
+
+        bg = colors.get("background")
+        card_bg = colors.get("card_background") or bg
+        text_primary = colors.get("text_primary")
+        border_color = borders.get("color") or colors.get("border")
+        border_width = borders.get("width")
+
+        dashboards_el = self.root.find("dashboards")
+        if dashboards_el is None:
+            return
+
+        target_set: Optional[set[str]] = set(apply_to) if apply_to else None
+        touched_worksheets: set[str] = set()
+
+        for db in dashboards_el.findall("dashboard"):
+            if target_set is not None and db.get("name") not in target_set:
+                continue
+
+            # Dashboard <style><style-rule element="table"> background.
+            if bg:
+                db_style = db.find("style")
+                if db_style is None:
+                    db_style = etree.SubElement(db, "style")
+                    # style must be early in the dashboard element order;
+                    # place it before <size> if present.
+                    size_el = db.find("size")
+                    if size_el is not None:
+                        db.remove(db_style)
+                        size_el.addprevious(db_style)
+                _upsert_style_rule_format(db_style, "table", "background-color", bg)
+
+            # Walk every zone in this dashboard and rewrite zone-style formats.
+            for zone in db.iter("zone"):
+                zs = zone.find("zone-style")
+                if zs is None:
+                    continue
+                ztype = zone.get("type-v2")
+                # Containers get the page background; inner zones (cards,
+                # worksheets, filters) get the card background.
+                z_bg = bg if ztype == "layout-flow" else card_bg
+                if z_bg:
+                    _set_format(zs, "background-color", z_bg)
+                if border_color:
+                    _set_format(zs, "border-color", border_color)
+                if border_width is not None:
+                    _set_format(zs, "border-width", str(int(border_width)))
+
+                # Collect worksheet names referenced from this dashboard so we
+                # can restyle their pane text.
+                if zone.get("name") and not ztype:
+                    touched_worksheets.add(zone.get("name"))
+
+        # Re-skin pane-level mark text (color + font-size) for worksheets
+        # that belong to the targeted dashboards.
+        title_size = typography.get("title_size")
+        body_size = typography.get("body_size")
+        font_family = typography.get("font_family")
+        for ws_name in touched_worksheets:
+            try:
+                ws = self._find_worksheet(ws_name)
+            except ValueError:
+                continue
+            table = ws.find("table")
+            if table is None:
+                continue
+            for pane in table.iter("pane"):
+                pane_style = pane.find("style")
+                if pane_style is None:
+                    pane_style = etree.SubElement(pane, "style")
+                if text_primary:
+                    _upsert_style_rule_format(
+                        pane_style, "mark-labels", "color", text_primary
+                    )
+                if body_size is not None:
+                    _upsert_style_rule_format(
+                        pane_style, "mark-labels", "font-size",
+                        f"{int(body_size)}pt",
+                    )
+                if font_family:
+                    _upsert_style_rule_format(
+                        pane_style, "mark-labels", "font-family", font_family
+                    )
+                if title_size is not None:
+                    _upsert_style_rule_format(
+                        pane_style, "title", "font-size", f"{int(title_size)}pt",
+                    )
 
     def remove_calculated_field(self, field_name: str) -> str:
         """Remove a calculated field."""
@@ -542,7 +721,10 @@ class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin,
         if windows is None:
             windows = etree.SubElement(self.root, "windows")
 
-        # Remove any pre-existing window with the same name to avoid duplicates
+        # Remove any pre-existing window with the same name. Tableau's XSD
+        # scopes <windows> identity by name alone (error D2E8DA72 otherwise),
+        # so add_dashboard / add_worksheet guard against cross-class name
+        # collisions up front — this dedup only fires for same-class re-adds.
         for existing in windows.findall("window"):
             if existing.get("name") == name:
                 windows.remove(existing)

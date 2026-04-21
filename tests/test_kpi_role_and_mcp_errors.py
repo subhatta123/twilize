@@ -34,7 +34,7 @@ def test_string_kpi_with_explicit_dimension_role_emits_dimension_column():
 
     editor.add_calculated_field(
         field_name="_kpi_Sales",
-        formula="'SALES' + CHR(10) + STR(SUM([Profit]))",
+        formula="'SALES' + CHAR(10) + STR(SUM([Profit]))",
         datatype="string",
         role="dimension",
         field_type="nominal",
@@ -105,3 +105,37 @@ def test_safe_fast_mcp_passes_successful_returns_through():
 
     fn = server._tool_manager._tools["happy_tool"].fn
     assert fn() == "ok"
+
+
+def test_add_dashboard_rejects_duplicate_names():
+    """0.33.1 regression: Tableau's DashboardParser crashes with a null-pointer
+    dereference inside DashboardUtils::FetchImage (error 0x00BF554A "Internal
+    Error") when a .twb contains two <dashboard> elements with the same name.
+
+    add_dashboard() must reject the duplicate up front with a clear error
+    instead of writing a workbook Tableau cannot open.
+    """
+    editor = TWBEditor("")
+    editor.add_worksheet("Sheet1")
+    editor.add_dashboard("Exec", worksheet_names=["Sheet1"])
+
+    with pytest.raises(ValueError, match="already exists"):
+        editor.add_dashboard("Exec", worksheet_names=["Sheet1"])
+
+
+def test_dashboard_name_colliding_with_worksheet_is_rejected():
+    """0.33.1 regression: a dashboard sharing a worksheet's name produces
+    either a Tableau XSD error (D2E8DA72 "windows declares duplicate identity
+    constraint unique values", because <windows> is name-unique regardless of
+    class) or — if the worksheet window is silently wiped — a FetchImage null
+    deref (0x00BF554A). The only safe answer is to reject the collision.
+    """
+    editor = TWBEditor("")
+    editor.add_worksheet("Top Customers by Profit")
+
+    with pytest.raises(ValueError, match="collides with an existing worksheet"):
+        editor.add_dashboard(
+            "Top Customers by Profit",
+            worksheet_names=["Top Customers by Profit"],
+            layout="vertical",
+        )

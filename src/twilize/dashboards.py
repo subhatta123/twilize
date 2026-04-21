@@ -82,6 +82,43 @@ class DashboardsMixin:
         for ws_name in worksheet_names:
             self._find_worksheet(ws_name)
 
+        # Duplicate-name guard: Tableau's DOM parser crashes
+        # (DashboardUtils::FetchImage null-pointer deref, error 0x00BF554A
+        # "Internal Error / Unable to complete action") when two <dashboard>
+        # elements share a name. Reject early with a clear message.
+        existing = self.root.find("dashboards")
+        if existing is not None:
+            for db_el in existing.findall("dashboard"):
+                if db_el.get("name") == dashboard_name:
+                    raise ValueError(
+                        f"Dashboard name '{dashboard_name}' already exists. "
+                        "Tableau cannot open workbooks with duplicate dashboard "
+                        "names (crashes with 'Internal Error / 00BF554A'). "
+                        "Use a unique name, or delete/rename the existing one first."
+                    )
+
+        # Cross-class window-name guard: Tableau's <windows> XSD enforces
+        # uniqueness by name alone (error D2E8DA72 "element 'windows' declares
+        # duplicate identity constraint unique values"), regardless of window
+        # class. A dashboard therefore cannot share a name with any worksheet.
+        # We also can't silently drop the worksheet's window (the dashboard
+        # would reference a worksheet with no window metadata and FetchImage
+        # would null-deref during set-dashboards-dom, 0x00BF554A).
+        ws_el = self.root.find("worksheets")
+        if ws_el is not None:
+            for ws in ws_el.findall("worksheet"):
+                if ws.get("name") == dashboard_name:
+                    raise ValueError(
+                        f"Dashboard name '{dashboard_name}' collides with an "
+                        "existing worksheet of the same name. Tableau's "
+                        "workbook XSD requires <window> names to be unique "
+                        "across worksheets and dashboards (error D2E8DA72), "
+                        "and sharing a name also crashes Tableau on open "
+                        "(0x00BF554A in DashboardUtils::FetchImage). "
+                        "Rename the dashboard — e.g. "
+                        f"'{dashboard_name} Dashboard'."
+                    )
+
         dashboards = self.root.find("dashboards")
         if dashboards is None:
             insert_before = None

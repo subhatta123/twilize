@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.34.0] - 2026-04-21
+
+### Added
+
+- **`apply_style_reference(image_path=..., css=..., html=...)`** on `TWBEditor` and as an MCP tool. Extracts a palette + typography + border styling from a reference image and/or CSS/HTML snippet, then rewrites every dashboard `<style>` background, every zone's `<zone-style>` background/border/border-color, and worksheet pane mark-label colour and font-size to match. CSS recognised: `background`, `background-color`, `color`, `font-family`, `font-size`, `border`, `border-color`, `border-width`, `border-radius`. Image palette uses `colorthief` (no scikit-learn), with roles assigned by luminance (lightest → background, darkest → text) and saturation (most-saturated non-background → accent). Merge policy when both sources are supplied: CSS wins on typography, image wins on palette.
+
+## [0.33.1] - 2026-04-19
+
+### Fixed
+
+- **Duplicate dashboard names crashed Tableau on open (error `0x00BF554A` "Unable to complete action / Internal Error")**: when `add_dashboard` was called twice with the same name, the resulting `.twb` contained two `<dashboard name="X">` elements. Tableau's `workbook-parser.set-dashboards-dom` step then hit a null-pointer dereference inside `DashboardUtils::FetchImage` while resolving the second dashboard's thumbnail, and refused to open the workbook. `add_dashboard` now rejects duplicate names up front with a clear `ValueError` instead of writing a workbook Tableau cannot open.
+- **Dashboard sharing a worksheet's name produced either `0x00BF554A` or XSD error `D2E8DA72`**: `_add_window` deduplicated `<window>` entries by `name` alone. When a caller added a worksheet and then `add_dashboard(dashboard_name=<same name>, worksheet_names=[<same name>])`, the new dashboard window evicted the worksheet's own window, and Tableau's `DashboardParser::SetDashboardDocFromDOM_Impl` null-dereferenced in `DashboardUtils::FetchImage`. Keeping both windows is not an option either — Tableau's XSD enforces `<windows>` identity by name alone (error `D2E8DA72` *"element 'windows' declares duplicate identity constraint unique values"*). `add_dashboard` now rejects a dashboard name that collides with any existing worksheet name up front with a clear `ValueError` suggesting a renamed alternative.
+- **KPI display calcs rejected on shelves ("The calculation '_kpi_Sales' can't be applied to a user-defined aggregate")**: KPI label calcs are string-typed but their formulas embed `SUM(...)`, making them user-defined aggregates. `_prepare_enhanced_kpis` registered them with `role="dimension"` to avoid the 0.33.0 outer-SUM wrapping, and `FieldRegistry.parse_expression` then emitted a `[none:…:nk]` (dimension) column-instance on the Text shelf — Tableau rejects an aggregate expression in a dimension slot. `FieldInfo` now carries an `is_aggregate` flag set when the calc's formula matches `_AGGREGATE_FUNCTION_RE`, and `parse_expression` promotes derivation to `"User"` whenever a calculated field is aggregate *or* a measure. The Text encoding now references `[usr:Calculation_X:nk]` (user-defined aggregate, nominal), which is the form Tableau itself writes for aggregate string calcs.
+- **Invalid `CHR(10)` calls in KPI display calcs (red "!" in Data pane)**: `_prepare_enhanced_kpis` emitted `CHR(10)` for newline separators inside KPI label calcs, but Tableau has no `CHR` function — only `CHAR`. All three occurrences in `pipeline.py` now use `CHAR(10)`. A new `formula_validator` module (backed by `references/tableau_all_functions.json`, 151 functions) is wired into `add_calculated_field` and rejects unknown functions early with a `difflib` suggestion (e.g. `"CHR is not a Tableau function — did you mean CHAR?"`).
+
 ## [0.33.0] - 2026-04-18
 
 ### Fixed

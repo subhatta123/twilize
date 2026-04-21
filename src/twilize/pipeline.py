@@ -361,13 +361,13 @@ def _prepare_enhanced_kpis(
             # The change line is only shown when PY data exists (chg_expr is non-empty)
             full_formula = (
                 f"'{display_name}' + "
-                f"IF LEN({chg_expr}) > 0 THEN CHR(10) + ({chg_expr}) + ' vs PY' ELSE '' END + "
-                f"CHR(10) + ({val_expr})"
+                f"IF LEN({chg_expr}) > 0 THEN CHAR(10) + ({chg_expr}) + ' vs PY' ELSE '' END + "
+                f"CHAR(10) + ({val_expr})"
             )
         else:
             # Simple KPI: TITLE + newline + VALUE
             full_formula = (
-                f"'{display_name}' + CHR(10) + "
+                f"'{display_name}' + CHAR(10) + "
                 f"({val_expr})"
             )
 
