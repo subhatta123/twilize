@@ -3,6 +3,27 @@
 > **Tableau Workbook (.twb/.twbx) generation toolkit for reproducible dashboards and workbook engineering**
 > Programmatically create Tableau workbooks with stable analytical primitives, dashboard composition, and built-in structural validation.
 
+<!--
+  Smithery badge — enable once the listing is live.  See
+  docs/PUBLISHING_SMITHERY.md for the exact submission procedure.
+
+  [![smithery badge](https://smithery.ai/badge/@subhatta123/twilize)](https://smithery.ai/server/@subhatta123/twilize)
+-->
+
+## Install in one click
+
+If you just want to use twilize from an MCP client and skip the Python
+setup entirely, install it through the Smithery MCP registry:
+
+- **[Install twilize on Smithery](https://smithery.ai/server/@subhatta123/twilize)** — one-click install for Cursor, Claude Desktop, VS Code, Claude Code, Windsurf, and the Smithery CLI.
+
+Smithery writes the `uvx twilize` launch command directly into your MCP
+client's config. You need [`uv`](https://docs.astral.sh/uv/getting-started/installation/)
+installed locally (Smithery will prompt you if it's missing) — nothing else.
+
+If you'd rather wire the server up by hand, or you want the full Python
+library API, keep reading.
+
 ## Overview
 
 **twilize** is a Model Context Protocol (MCP) server and Python toolkit for generating Tableau Desktop workbook files (`.twb` / `.twbx`) from code or AI-driven tool calls.
@@ -536,6 +557,12 @@ The `smithery.yaml` file is ready for submission to [Smithery](https://smithery.
 ### MCP Server Registry
 
 The `mcp-server.json` file follows the MCP server schema for registry submission.
+
+## Attribution
+
+Twilize builds upon and was inspired by [cwtwb](https://github.com/imgwho/cwtwb), a Python-based open-source tool for programmatically generating and automating the migration of Tableau Workbooks (`.twb` files), originally authored by [@imgwho](https://github.com/imgwho).
+
+cwtwb is licensed under the [GNU Affero General Public License v3.0 (AGPL-3.0)](https://www.gnu.org/licenses/agpl-3.0.html). In accordance with that license, Twilize is also distributed under AGPL-3.0.
 
 ## License
 

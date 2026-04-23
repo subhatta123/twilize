@@ -1,131 +1,88 @@
 # Smithery MCP Server Registry Configuration
-# https://smithery.ai/docs/publishing
-
-name: twilize
-displayName: "Twilize — Tableau Workbook Builder"
-description: >
-  Tableau Workbook (.twb/.twbx) generation MCP server.
-  Programmatically create Tableau workbooks with stable analytical primitives,
-  dashboard composition, and built-in structural validation.
-  Supports 10+ chart types, dual-axis compositions, recipe charts,
-  calculated fields, parameters, dashboard actions, and workbook migration.
-
-version: "0.34.0"
-license: AGPL-3.0-or-later
-
-author:
-  name: Suddhasheel Bhattacharya
-  email: suddhasheel.bhattacharya@gmail.com
-  url: https://github.com/subhatta123/twilize
-
-repository: https://github.com/subhatta123/twilize
-homepage: https://github.com/subhatta123/twilize
-
-categories:
-  - visualization
-  - data
-  - business-intelligence
-
-tags:
-  - tableau
-  - twb
-  - twbx
-  - dashboards
-  - charts
-  - workbook
-  - bi
-  - data-visualization
-  - mcp
-
-runtime: python
-minRuntimeVersion: "3.10"
+# Docs: https://smithery.ai/docs/build/publish
+#
+# twilize ships as a *stdio* MCP server on Smithery so the server runs on the
+# user's own machine and has direct access to their local filesystem (CSV
+# input, .twbx output, reference images for styling).  That local access is
+# fundamental to what twilize does — a remote-only deployment would have no
+# way to read the user's `Sample - Superstore.csv` or write a `.twbx` back
+# into `~/Downloads`.
+#
+# Smithery's one-click install reads this file and writes the resulting
+# command into the user's MCP client config (Cursor, Claude Desktop, VS Code,
+# Claude Code, Windsurf, ...).  No pip / manual setup required on the user's
+# side — `uvx` fetches the latest twilize release from PyPI on first launch.
 
 startCommand:
   type: stdio
+
+  # Everything here is optional; defaults give the user the latest published
+  # twilize release with standard logging and no extra integrations.
   configSchema:
     type: object
-    properties: {}
+    title: Twilize
+    description: >-
+      Configuration for the twilize Tableau workbook builder MCP server. All
+      fields are optional — the defaults launch the latest published release
+      from PyPI.
+    properties:
+      version:
+        type: string
+        title: twilize version
+        description: >-
+          Pin a specific release from PyPI (e.g. "0.34.0"). Leave blank to
+          always use the latest published version.
+        default: ""
+      extras:
+        type: string
+        title: Optional extras
+        description: >-
+          Comma-separated list of PyPI extras to install alongside twilize.
+          Valid values: "pipeline" (CSV→Hyper conversion, required for the
+          csv_to_dashboard pipeline), "examples" (Hyper-backed example
+          workbooks), "extension" (Dashboard Extension backend), "mysql",
+          "mssql". Example: "pipeline,examples".
+        default: "pipeline"
+      logLevel:
+        type: string
+        title: Python log level
+        description: >-
+          Root Python logging level for the server process. Useful when
+          debugging a client integration.
+        enum: [DEBUG, INFO, WARNING, ERROR, CRITICAL]
+        default: INFO
+    required: []
+
+  exampleConfig:
+    version: ""
+    extras: "pipeline"
+    logLevel: INFO
+
+  # Produces the CLI command Smithery writes into the user's MCP client
+  # config.  We use `uvx` (from astral-sh/uv) because it:
+  #   • fetches and caches the wheel on first launch (no pre-install step),
+  #   • isolates twilize's deps from the system Python,
+  #   • supports the `package[extra]` / `package==version` pin syntax.
   commandFunction: |-
-    (config) => ({
-      command: "uvx",
-      args: ["twilize"]
-    })
-
-installInstructions: |
-  ## Installation
-
-  Install from PyPI:
-  ```bash
-  pip install twilize
-  ```
-
-  Or run directly with uvx (no install needed):
-  ```bash
-  uvx twilize
-  ```
-
-  ### Optional dependencies
-
-  ```bash
-  pip install "twilize[pipeline]"    # CSV-to-Hyper conversion
-  pip install "twilize[examples]"    # Hyper-backed examples
-  pip install "twilize[extension]"   # Tableau Dashboard Extension backend
-  ```
-
-  ## Client Configuration
-
-  ### Claude Desktop
-  Add to `claude_desktop_config.json`:
-  ```json
-  {
-    "mcpServers": {
-      "twilize": {
-        "command": "uvx",
-        "args": ["twilize"]
-      }
+    (config) => {
+      const extras = (config.extras || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const extrasSpec = extras.length ? `[${extras.join(",")}]` : "";
+      const versionSpec = config.version ? `==${config.version}` : "";
+      const pkg = `twilize${extrasSpec}${versionSpec}`;
+      return {
+        command: "uvx",
+        args: [pkg],
+        env: {
+          // Force unbuffered stdout so stdio framing is never stuck in a
+          // Python buffer when a client is slow to read.
+          PYTHONUNBUFFERED: "1",
+          PYTHONIOENCODING: "utf-8",
+          // twilize's server reads MCP_LOG_LEVEL in HTTP mode; harmless in
+          // stdio mode and handy for users who switch transports.
+          MCP_LOG_LEVEL: (config.logLevel || "INFO").toLowerCase(),
+        },
+      };
     }
-  }
-  ```
-
-  ### Claude Code
-  ```bash
-  claude mcp add twilize -- uvx twilize
-  ```
-
-  ### Cursor IDE
-  Settings → Features → MCP → Add New MCP Server
-  - Type: command
-  - Name: twilize
-  - Command: uvx twilize
-
-  ### VS Code
-  Add to `.vscode/mcp.json`:
-  ```json
-  {
-    "servers": {
-      "twilize": {
-        "command": "uvx",
-        "args": ["twilize"]
-      }
-    }
-  }
-  ```
-
-features:
-  - 40 MCP tools across 7 categories
-  - 10+ chart types (Bar, Line, Area, Pie, Map, Scatter, Heatmap, TreeMap, Bubble, Text/KPI)
-  - Dual-axis chart compositions
-  - 6 recipe charts (Donut, Lollipop, Bullet, Bump, Butterfly, Calendar)
-  - Dashboard composition with flexible layouts
-  - Filter and highlight dashboard actions
-  - Calculated fields with full Tableau formula support
-  - Interactive parameters (range, list)
-  - Reference lines, bands, and trend lines
-  - Custom and built-in color palettes
-  - Workbook migration between datasources
-  - CSV-to-dashboard end-to-end pipeline
-  - XSD schema validation (Tableau 2026.1)
-  - Undo/rollback support
-  - .twb and .twbx (packaged workbook) support
-  - MySQL, Tableau Server, and Hyper extract connections
-  - Agent skill resources for guided workflows
