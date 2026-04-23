@@ -271,7 +271,11 @@ def validate_suggestion(
             geo_quality_ok = True  # can't determine quality; allow maps
 
     if not has_geo or not geo_quality_ok:
-        map_charts = [c for c in charts if c.chart_type == "Map"]
+        # Never drop user-required Map charts — they were explicitly requested.
+        map_charts = [
+            c for c in charts
+            if c.chart_type == "Map" and not getattr(c, "required", False)
+        ]
         if map_charts:
             logger.info(
                 "Removed %d Map chart(s) — %s",
@@ -283,13 +287,23 @@ def validate_suggestion(
                 replacement = _map_replacement(mc, classified)
                 if replacement:
                     charts.append(replacement)
-        charts = [c for c in charts if c.chart_type != "Map"]
+        charts = [
+            c for c in charts
+            if c.chart_type != "Map" or getattr(c, "required", False)
+        ]
 
-    # Deduplicate — one chart per non-KPI type for dashboard variety
-    charts = deduplicate_charts(charts, max_per_type=1)
+    # Split required vs auto; dedup and trim ONLY the auto pool.
+    required_charts = [c for c in charts if getattr(c, "required", False)]
+    auto_charts = [c for c in charts if not getattr(c, "required", False)]
 
-    # Enforce max
-    charts = charts[:max_charts]
+    auto_charts = deduplicate_charts(auto_charts, max_per_type=1)
+
+    # Reserve slots for required charts — they always fit even when this
+    # pushes us slightly over max_charts (the user asked for them).
+    auto_budget = max(0, max_charts - len(required_charts))
+    auto_charts = auto_charts[:auto_budget]
+
+    charts = required_charts + auto_charts
 
     return DashboardSuggestion(
         charts=charts,

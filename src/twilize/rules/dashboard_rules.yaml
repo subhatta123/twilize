@@ -191,13 +191,26 @@ layout:
     bold: true
 
   filters:
+    # Row height of the filter strip itself (px).  Tableau collapses
+    # dropdowns below ~45 px so we default to 55 px.  Every template
+    # ships with a 30-px strip and gets re-flowed to this value by
+    # `_expand_filter_row` at build time.
     height: 30
+    min_height_px: 55
     font_size: 12
     background_color: "#192f3e"
     font_color: "#ffffff"
     max_filters: 3
-    # Filter apply mode: all (global), allUsingRelatedDatasource, selected
+    # Filter apply mode: all (global across the dashboard), selected
+    # (source-worksheet only).  Default is "all" so a single dropdown
+    # filters every chart on the dashboard that uses the same datasource.
     apply_mode: "all"
+    # Per-filter zone styling — makes each dropdown read as a clickable
+    # card rather than a line of text jammed against a dark band.
+    zone_background: "#ffffff"
+    zone_border_color: "#d0d4d9"
+    zone_border_width: 1
+    zone_margin: 6
 
   card_margin: 4
   outer_margin: 8

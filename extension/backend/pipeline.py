@@ -46,7 +46,9 @@ def generate_workbook(
     data_rows: list[list[Any]],
     plan: dict,
     output_dir: str = "",
-) -> str:
+    reference_image_path: str = "",
+    required_charts: list[dict] | None = None,
+) -> dict:
     """Generate a .twbx workbook from extension data and plan.
 
     Instead of re-inferring types from CSV text (lossy), we use the
@@ -58,9 +60,30 @@ def generate_workbook(
         data_rows: Raw data rows (list of lists).
         plan: Dashboard plan dict (from suggest_dashboard).
         output_dir: Directory for output .twbx. Defaults to temp dir.
+        reference_image_path: Optional path to a PNG/JPG reference image.
+            When provided, ``editor.apply_style_reference`` is invoked after
+            the dashboard is built so the extracted palette, card styling,
+            typography, and mark colors are applied to the workbook XML.
+        required_charts: Optional list of chart-spec dicts that MUST appear
+            in the final workbook. The caller (``app.suggest``) typically
+            prepends these into ``plan["charts"]`` already — this parameter
+            is kept for the manifest's ``required_charts_fulfilled`` field
+            so the UI can surface how many of the asks were honored.
 
     Returns:
-        Path to the generated .twbx file.
+        Dict with::
+
+            {
+              "output_path": "/tmp/.../Dashboard_ab12cd34.twbx",
+              "manifest": {
+                "dashboards": [...],              # editor.list_dashboards()
+                "filters": {...},                 # _summarize_filters(...)
+                "global_filter_groups": {...},    # _link_global_filters(...)
+                "required_charts_fulfilled": int,
+                "style_reference": {...} | None,
+                "warnings": [...],
+              },
+            }
     """
     if not output_dir:
         output_dir = tempfile.mkdtemp(prefix="twilize_ext_")
@@ -562,11 +585,100 @@ def generate_workbook(
     else:
         logger.info("Skipping theme — C3 template has built-in styling")
 
+    # Step 7d: Optional reference-image re-skin.  Applied AFTER the theme so
+    # the image palette + card styling win.  This mirrors the mainline
+    # ``twilize.pipeline.build_dashboard_from_csv`` behavior so trex-route
+    # users get the same "match this screenshot" experience as MCP users.
+    warnings: list[str] = []
+    style_reference_applied: dict | None = None
+    if reference_image_path:
+        ref_path = Path(reference_image_path)
+        if not ref_path.exists():
+            warnings.append(
+                f"reference_image_path '{reference_image_path}' not found on "
+                "disk; styling fell back to theme defaults."
+            )
+        else:
+            try:
+                style_reference_applied = editor.apply_style_reference(
+                    image_path=str(ref_path),
+                )
+                logger.info(
+                    "Applied style reference from %s: palette=%d colors",
+                    ref_path,
+                    len((style_reference_applied or {}).get("palette", [])),
+                )
+            except Exception as exc:
+                logger.warning("apply_style_reference failed: %s", exc)
+                warnings.append(
+                    f"Failed to apply reference_image_path "
+                    f"'{reference_image_path}': {exc}"
+                )
+
+    # Step 7e: Stamp shared ``filter-group`` integers on worksheet filters so
+    # Tableau recognises them as "Apply to Worksheets > All Using This Data
+    # Source" instead of the default "Only This Worksheet".  Without this
+    # pass the dashboard's Category/Region/Segment filters only filter the
+    # worksheet they were defined on — a bug users surfaced on the MCP path
+    # and which was fixed in the mainline pipeline; we mirror the fix here
+    # so the trex route picks it up too.
+    from twilize.pipeline import _link_global_filters, _summarize_filters
+
+    global_filter_groups = _link_global_filters(editor)
+
     # Step 8: Save as .twbx
     safe_title = re.sub(r'[<>:"/\\|?*]', '', title).replace(' ', '_').strip('_') or "Dashboard"
     output_path = work_dir / f"{safe_title}_{run_id}.twbx"
     logger.info("Saving workbook to %s", output_path)
     editor.save(str(output_path), extra_files=[str(hyper_path)])
 
+    # Step 9: Self-verify — read back straight from the saved editor state
+    # and build a manifest the UI can quote verbatim.  Matches the shape
+    # emitted by ``twilize.pipeline.build_dashboard_from_csv`` so callers
+    # can consume either path interchangeably.
+    try:
+        dashboards_manifest = editor.list_dashboards()
+    except Exception as exc:
+        logger.warning("editor.list_dashboards failed: %s", exc)
+        dashboards_manifest = []
+
+    filters_manifest = _summarize_filters(dashboards_manifest, global_filter_groups)
+    if filters_manifest["count"] and not filters_manifest["clickable"]:
+        warnings.append(
+            f"Filter zone under 45 px "
+            f"(min {filters_manifest['min_height_px']} px) — "
+            "filters may render too small to click in Tableau."
+        )
+
+    required_requested = len(required_charts or [])
+    required_fulfilled = 0
+    if required_requested:
+        built_titles = {
+            (c.title or "").strip().lower()
+            for c in suggestion.charts
+            if _safe_worksheet_name(c.title, 0, set()) in configured_ok
+        }
+        for rc in required_charts or []:
+            rc_title = (rc.get("title") or "").strip().lower()
+            if rc_title and rc_title in built_titles:
+                required_fulfilled += 1
+
+    manifest = {
+        "output_path": str(output_path),
+        "dashboards": dashboards_manifest,
+        "filters": filters_manifest,
+        "global_filter_groups": global_filter_groups,
+        "required_charts_requested": required_requested,
+        "required_charts_fulfilled": required_fulfilled,
+        "style_reference": (
+            {
+                "path": str(Path(reference_image_path).resolve()),
+                "extracted": style_reference_applied,
+            }
+            if style_reference_applied else None
+        ),
+        "warnings": warnings,
+    }
+
     logger.info("Generated workbook: %s", output_path)
-    return str(output_path)
+    return {"output_path": str(output_path), "manifest": manifest}

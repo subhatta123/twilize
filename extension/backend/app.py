@@ -10,6 +10,9 @@ In production, also serves the built Vite frontend as static files.
 
 from __future__ import annotations
 
+import base64
+import binascii
+import json
 import logging
 import os
 import tempfile
@@ -57,12 +60,28 @@ class SuggestRequest(BaseModel):
     max_charts: int = 8
     image_base64: str = ""
     sample_rows: list[list[Any]] = []
+    # Chart specs the caller wants guaranteed in the output. Each item is a
+    # dict matching the mainline ``required_charts`` shape, at minimum
+    # ``{"title": "Top 10 Customers by Profit", "chart_type": "Bar",
+    #     "shelves": [...]}``. Missing fields are tolerated — the extension
+    # prepends these to the plan and lets the downstream validator decide
+    # whether each one is constructible.
+    required_charts: list[dict] = []
 
 
 class GenerateRequest(BaseModel):
     fields: list[dict]
     data_rows: list[list[Any]]
     plan: dict
+    # Raw base64 (no data-URL prefix) of a reference image whose palette,
+    # card styling, and typography should be applied to the final workbook
+    # via ``editor.apply_style_reference``. Leave empty to fall back to the
+    # older ``theme_colors`` path only.
+    reference_image_base64: str = ""
+    # Passed through to the pipeline so the manifest can report how many
+    # required charts actually landed. The caller is expected to have
+    # already prepended these into ``plan["charts"]`` via ``/api/suggest``.
+    required_charts: list[dict] = []
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +132,28 @@ async def suggest(req: SuggestRequest) -> JSONResponse:
         sample_rows=req.sample_rows or None,
     )
 
+    # Prepend any user-required chart specs so they survive the downstream
+    # trim / dedup pass. Dedup by normalized title so we don't end up with
+    # "Top 10 Customers by Profit" twice when the LLM already returned one.
+    if req.required_charts:
+        plan_charts = list(plan.get("charts", []))
+        existing_titles = {
+            (c.get("title") or "").strip().lower()
+            for c in plan_charts
+        }
+        required_prepend: list[dict] = []
+        for rc in req.required_charts:
+            rc_title = (rc.get("title") or "").strip().lower()
+            if rc_title and rc_title in existing_titles:
+                continue
+            rc_copy = dict(rc)
+            rc_copy["_required"] = True
+            required_prepend.append(rc_copy)
+        if required_prepend:
+            plan["charts"] = required_prepend + plan_charts
+        plan["required_charts_requested"] = len(req.required_charts)
+        plan["required_charts"] = list(req.required_charts)
+
     # Tag response with engine info — if _warning is set, LLM failed
     has_api_key = bool(
         os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("OPENAI_API_KEY")
@@ -133,11 +174,59 @@ async def suggest(req: SuggestRequest) -> JSONResponse:
     return JSONResponse(content=plan)
 
 
+def _decode_reference_image(image_base64: str) -> str:
+    """Decode a base64 reference image to a temp file and return its path.
+
+    Accepts either a bare base64 string or a full ``data:image/...;base64,``
+    URL (the Extensions API typically hands back the latter). Returns an
+    empty string on any decode failure so the caller can fall back to the
+    theme-only path without aborting the whole generation.
+    """
+    if not image_base64:
+        return ""
+    b64 = image_base64
+    if b64.startswith("data:"):
+        _, _, b64 = b64.partition(",")
+    try:
+        raw = base64.b64decode(b64, validate=False)
+    except (binascii.Error, ValueError) as exc:
+        logger.warning("Could not base64-decode reference image: %s", exc)
+        return ""
+    if not raw:
+        return ""
+    ext = ".png" if raw[:8].startswith(b"\x89PNG") else ".jpg"
+    fd, tmp_path = tempfile.mkstemp(prefix="twilize_ref_", suffix=ext)
+    try:
+        os.write(fd, raw)
+    finally:
+        os.close(fd)
+    return tmp_path
+
+
+def _manifest_header_value(manifest: dict) -> str:
+    """Base64-encode the manifest so it can ride on a response header.
+
+    Headers are 8-bit ASCII only and most reverse proxies cap them around
+    8 KB. We base64-encode the compact JSON so arbitrary field names (even
+    non-ASCII) survive, and we don't have to worry about newlines.
+    """
+    payload = json.dumps(manifest, default=str, separators=(",", ":"))
+    return base64.b64encode(payload.encode("utf-8")).decode("ascii")
+
+
 @app.post("/api/generate")
 async def generate(req: GenerateRequest) -> FileResponse:
-    """Generate a .twbx workbook from data and a dashboard plan."""
+    """Generate a .twbx workbook from data and a dashboard plan.
+
+    The response body is the raw ``.twbx`` file download.  The generation
+    manifest (dashboards, filter scope, style-reference summary, required-
+    charts fulfilment, warnings) is surfaced on an ``X-Twilize-Manifest``
+    response header as base64-encoded JSON so the frontend can consume it
+    without a second round-trip.
+    """
     job_id = uuid.uuid4().hex[:8]
     _jobs[job_id] = {"status": "running", "progress": 0}
+    ref_tmp_path = ""
 
     try:
         tableau_fields = [
@@ -151,25 +240,78 @@ async def generate(req: GenerateRequest) -> FileResponse:
             for f in req.fields
         ]
 
+        ref_tmp_path = _decode_reference_image(req.reference_image_base64)
+
+        # Accept required_charts either on the top-level request or via the
+        # plan dict (if /api/suggest already prepended them). Prefer the
+        # top-level value so the manifest's "fulfilled" count matches what
+        # the caller actually asked for.
+        required_charts = req.required_charts or req.plan.get("required_charts") or []
+
         _jobs[job_id]["progress"] = 20
-        output_path = generate_workbook(
+        result = generate_workbook(
             fields=tableau_fields,
             data_rows=req.data_rows,
             plan=req.plan,
+            reference_image_path=ref_tmp_path,
+            required_charts=required_charts,
         )
+        output_path = result["output_path"]
+        manifest = result.get("manifest", {})
+        manifest["job_id"] = job_id
 
-        _jobs[job_id] = {"status": "completed", "progress": 100, "path": output_path}
+        _jobs[job_id] = {
+            "status": "completed",
+            "progress": 100,
+            "path": output_path,
+            "manifest": manifest,
+        }
 
         filename = Path(output_path).name
         return FileResponse(
             path=output_path,
             media_type="application/octet-stream",
             filename=filename,
+            headers={
+                "X-Twilize-Manifest": _manifest_header_value(manifest),
+                "X-Twilize-Job-Id": job_id,
+                # Expose custom headers so browser JS can read them (CORS).
+                "Access-Control-Expose-Headers": (
+                    "X-Twilize-Manifest, X-Twilize-Job-Id"
+                ),
+            },
         )
     except Exception as exc:
         logger.exception("Generate failed: %s", exc)
         _jobs[job_id] = {"status": "failed", "error": str(exc)}
         raise HTTPException(status_code=500, detail=str(exc))
+    finally:
+        if ref_tmp_path and os.path.exists(ref_tmp_path):
+            try:
+                os.unlink(ref_tmp_path)
+            except OSError:
+                pass
+
+
+@app.get("/api/manifest/{job_id}")
+async def manifest(job_id: str) -> JSONResponse:
+    """Return the generation manifest for a completed job.
+
+    Complementary to ``/api/generate`` for clients that can't read custom
+    response headers (some mobile webviews, proxies that strip them, ...).
+    """
+    job = _jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.get("status") != "completed":
+        return JSONResponse(
+            content={
+                "status": job.get("status"),
+                "progress": job.get("progress"),
+                "error": job.get("error"),
+            }
+        )
+    return JSONResponse(content=job.get("manifest", {}))
 
 
 @app.get("/api/status/{job_id}")

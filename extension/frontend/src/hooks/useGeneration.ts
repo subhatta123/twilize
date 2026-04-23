@@ -1,11 +1,13 @@
 import { useState, useMemo } from 'react'
 import type { DashboardPlan, FieldInfo } from '../utils/types'
+import type { GenerationManifest } from '../utils/api'
 import { suggestDashboard, generateWorkbook } from '../utils/api'
 
 export function useGeneration() {
   const [suggesting, setSuggesting] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [downloadUrl, setDownloadUrl] = useState('')
+  const [manifest, setManifest] = useState<GenerationManifest | null>(null)
   const [error, setError] = useState('')
 
   const generate = useMemo(() => ({
@@ -15,13 +17,16 @@ export function useGeneration() {
       prompt: string,
       imageBase64: string,
       dataRows: unknown[][] = [],
+      requiredCharts: unknown[] = [],
     ): Promise<DashboardPlan | null> => {
       setSuggesting(true)
       setError('')
       try {
         // Send first 30 rows as sample for statistical analysis
         const sampleRows = dataRows.slice(0, 30)
-        const plan = await suggestDashboard(fields, rowCount, prompt, imageBase64, 5, sampleRows)
+        const plan = await suggestDashboard(
+          fields, rowCount, prompt, imageBase64, 5, sampleRows, requiredCharts,
+        )
         return plan
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Suggestion failed')
@@ -35,13 +40,18 @@ export function useGeneration() {
       fields: FieldInfo[],
       dataRows: unknown[][],
       plan: DashboardPlan,
+      opts: {
+        referenceImageBase64?: string
+        requiredCharts?: unknown[]
+      } = {},
     ): Promise<string | null> => {
       setGenerating(true)
       setError('')
       try {
-        const url = await generateWorkbook(fields, dataRows, plan)
-        setDownloadUrl(url)
-        return url
+        const result = await generateWorkbook(fields, dataRows, plan, opts)
+        setDownloadUrl(result.downloadUrl)
+        setManifest(result.manifest)
+        return result.downloadUrl
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Generation failed')
         return null
@@ -51,5 +61,5 @@ export function useGeneration() {
     },
   }), [])
 
-  return { generate, suggesting, generating, downloadUrl, error }
+  return { generate, suggesting, generating, downloadUrl, manifest, error }
 }

@@ -37,6 +37,7 @@ class ChartSuggestion:
     sort_descending: str = ""  # e.g. "SUM(Sales)" — adds descending shelf sort
     text_format: dict | None = field(default=None)  # {"AVG(Margin)": "0%"}
     label_runs: list[dict] | None = field(default=None)  # Rich-text label runs for KPI cards
+    required: bool = False  # True → user-requested, never trimmed/dedup-dropped
 
 
 @dataclass
@@ -54,6 +55,7 @@ def suggest_charts(
     schema: ClassifiedSchema,
     max_charts: int = 14,
     rules: dict | None = None,
+    required_charts: list[dict] | None = None,
 ) -> DashboardSuggestion:
     """Suggest charts based on the classified schema.
 
@@ -65,6 +67,17 @@ def suggest_charts(
         max_charts: Maximum number of charts to suggest.
         rules: Dashboard rules dict (from ``dashboard_rules.load_rules``).
             When *None*, the built-in defaults are loaded automatically.
+        required_charts: Optional list of user-specified chart specs that MUST
+            appear in the final suggestion. Each entry is a dict like::
+
+                {"title": "Top 10 Customers by Profit",
+                 "kind": "bar",
+                 "rows": "Customer Name",
+                 "columns": "SUM(Profit)",
+                 "top_n": 10, "top_by": "SUM(Profit)",
+                 "sort_descending": "SUM(Profit)"}
+
+            Required charts bypass trim/dedup and are always included.
 
     Returns:
         DashboardSuggestion with prioritized chart list.
@@ -72,6 +85,15 @@ def suggest_charts(
     if rules is None:
         from twilize.dashboard_rules import get_default_rules
         rules = get_default_rules()
+
+    # Build required-chart suggestions up front (not subject to story-score
+    # override or dedup removal — they carry required=True as a sentinel).
+    required_suggestions: list[ChartSuggestion] = []
+    if required_charts:
+        for i, spec in enumerate(required_charts):
+            cs = build_required_chart_suggestion(spec, index=i)
+            if cs:
+                required_suggestions.append(cs)
 
     suggestions: list[ChartSuggestion] = []
 
@@ -380,7 +402,8 @@ def suggest_charts(
     for s in suggestions:
         s.priority = _story_score(s.chart_type, schema, s.shelves, rules)
 
-    # Sort by story score and trim
+    # Sort by story score (required-chart priorities are preserved separately
+    # and injected after dedup / trim).
     suggestions.sort(key=lambda s: s.priority, reverse=True)
 
     # --- Best practice: temporal guard ---
@@ -404,9 +427,12 @@ def suggest_charts(
     all_ranked = list(suggestions)
 
     # --- Best practice: deduplicate chart types ---
-    # Only one chart per non-KPI type to maximise dashboard variety
+    # Only one chart per non-KPI type to maximise dashboard variety.
+    # Required charts are always preserved (never dropped by dedup/trim).
     suggestions = deduplicate_charts(suggestions, max_per_type=1)
-    suggestions = suggestions[:max_charts]
+    # Reserve slots for required charts when trimming auto-suggestions.
+    auto_budget = max(0, max_charts - len(required_suggestions))
+    suggestions = suggestions[:auto_budget]
 
     # --- Fill available space: if template has empty slots, add more charts ---
     # When fill_available_space is enabled, check if the number of non-KPI
@@ -449,7 +475,12 @@ def suggest_charts(
                         "Fill space: added '%s' (%s, score=%d)",
                         candidate.title, candidate.chart_type, candidate.priority,
                     )
-            suggestions = suggestions[:max_charts]
+            suggestions = suggestions[:auto_budget]
+
+    # Prepend required charts so they always appear, even when max_charts
+    # would otherwise trim them out.
+    if required_suggestions:
+        suggestions = required_suggestions + suggestions
 
     # Determine layout
     n = len(suggestions)
@@ -493,6 +524,10 @@ def deduplicate_charts(
 
     for s in charts:
         ct = s.chart_type
+        # User-required charts always pass through dedup untouched.
+        if getattr(s, "required", False):
+            deduped.append(s)
+            continue
         primary_fields = frozenset(
             sh.field_name for sh in s.shelves if sh.shelf in ("columns", "rows")
         )
@@ -637,6 +672,171 @@ def smart_aggregation(field_name: str) -> str:
 
 # Keep backward-compatible alias
 _default_aggregation = smart_aggregation
+
+
+# ── Required-chart spec conversion ──────────────────────────────────
+
+_KIND_TO_MARK_TYPE = {
+    "bar": "Bar",
+    "line": "Line",
+    "area": "Area",
+    "scatter": "Scatterplot",
+    "scatterplot": "Scatterplot",
+    "pie": "Pie",
+    "map": "Map",
+    "heatmap": "Heatmap",
+    "tree_map": "Tree Map",
+    "treemap": "Tree Map",
+    "text": "Text",
+    "kpi": "Text",
+    "gantt": "Gantt Bar",
+    "circle": "Circle",
+    "square": "Square",
+    "automatic": "Automatic",
+}
+
+
+def _parse_field_expr(expr: str) -> tuple[str, str]:
+    """Split an expression like ``SUM(Sales)`` into ``(field, aggregation)``.
+
+    Returns ``(field_name, "")`` for bare dimension expressions.
+    Supported aggregations: ``SUM``, ``AVG``, ``MIN``, ``MAX``, ``COUNT``,
+    ``COUNTD``, ``MEDIAN``, ``STDEV``, ``VAR``, ``ATTR``.
+    """
+    import re as _re
+
+    if not isinstance(expr, str):
+        return ("", "")
+    s = expr.strip()
+    if not s:
+        return ("", "")
+    m = _re.match(
+        r"^(SUM|AVG|MIN|MAX|COUNT|COUNTD|MEDIAN|STDEV|VAR|ATTR)\s*\(\s*(.+?)\s*\)\s*$",
+        s, flags=_re.IGNORECASE,
+    )
+    if m:
+        return (m.group(2).strip(), m.group(1).upper())
+    return (s, "")
+
+
+def build_required_chart_suggestion(
+    spec: dict,
+    index: int = 0,
+) -> ChartSuggestion | None:
+    """Convert a user-supplied chart spec dict into a ``ChartSuggestion``.
+
+    Accepted keys (all optional unless noted):
+        kind (str):   "bar", "line", "scatter", "pie", "map", "heatmap",
+                      "tree_map", "text"/"kpi". Defaults to "bar" when at
+                      least one measure/dim is given, else "Automatic".
+        title (str):  Worksheet title; auto-generated from shelves if omitted.
+        columns (str | list[str]): Columns-shelf field expressions
+                                   (e.g. "SUM(Profit)").
+        rows (str | list[str]):    Rows-shelf field expressions.
+        color (str):  Color-shelf field expression.
+        size (str):   Size-shelf field expression.
+        label (str):  Label-shelf field expression.
+        detail (str): Detail-shelf field expression.
+        top_n (int):  Top-N filter count.
+        top_by (str): Measure expression used to rank Top-N
+                      (defaults to the first measure in columns/rows).
+        top_field (str): Dimension to apply Top-N on
+                         (defaults to first dimension in rows/columns).
+        sort_descending (str): Measure expression to sort descending by.
+        text_format (dict): Tableau number-format overrides
+                            (e.g. {"SUM(Profit)": "$#,##0"}).
+        reason (str): Human explanation shown in the manifest.
+
+    Returns ``None`` when the spec is structurally unusable
+    (e.g. no shelves and no kind).
+    """
+    if not isinstance(spec, dict):
+        return None
+
+    kind = str(spec.get("kind") or spec.get("chart_type") or "").strip().lower()
+    mark_type = _KIND_TO_MARK_TYPE.get(kind, "Bar" if kind == "" else kind.title())
+
+    shelves: list[ShelfAssignment] = []
+
+    def _add(shelf_name: str, value):
+        if value is None:
+            return
+        items = value if isinstance(value, list) else [value]
+        for item in items:
+            field_name, agg = _parse_field_expr(str(item))
+            if field_name:
+                shelves.append(ShelfAssignment(field_name, shelf_name, agg))
+
+    _add("columns", spec.get("columns") or spec.get("cols"))
+    _add("rows", spec.get("rows"))
+    _add("color", spec.get("color"))
+    _add("size", spec.get("size"))
+    _add("label", spec.get("label"))
+    _add("detail", spec.get("detail"))
+
+    if not shelves:
+        logger.warning("Required chart spec #%d has no shelves; skipping", index)
+        return None
+
+    # Title fallback
+    title = str(spec.get("title") or "").strip()
+    if not title:
+        primary_measure = next(
+            (sh for sh in shelves if sh.aggregation), None
+        )
+        primary_dim = next(
+            (sh for sh in shelves
+             if sh.shelf in ("rows", "columns") and not sh.aggregation),
+            None,
+        )
+        if primary_measure and primary_dim:
+            title = f"{primary_measure.aggregation}({primary_measure.field_name}) by {primary_dim.field_name}"
+        elif primary_measure:
+            title = f"{primary_measure.aggregation}({primary_measure.field_name})"
+        else:
+            title = f"Required Chart {index + 1}"
+
+    # Top-N filter
+    top_n_dict = None
+    top_n = spec.get("top_n")
+    if isinstance(top_n, int) and top_n > 0:
+        top_field = spec.get("top_field") or ""
+        if not top_field:
+            # First dimension on rows, then columns
+            for sh in shelves:
+                if sh.shelf in ("rows", "columns") and not sh.aggregation:
+                    top_field = sh.field_name
+                    break
+        top_by = spec.get("top_by") or ""
+        if not top_by:
+            first_measure = next(
+                (sh for sh in shelves if sh.aggregation), None
+            )
+            if first_measure:
+                top_by = f"{first_measure.aggregation}({first_measure.field_name})"
+        if top_field and top_by:
+            top_n_dict = {"field": top_field, "n": int(top_n), "by": top_by}
+
+    sort_desc = str(spec.get("sort_descending") or "").strip()
+    if not sort_desc and top_n_dict:
+        # When Top N is active, default to sorting by the same measure.
+        sort_desc = top_n_dict["by"]
+
+    text_format = spec.get("text_format")
+    if text_format is not None and not isinstance(text_format, dict):
+        text_format = None
+
+    return ChartSuggestion(
+        chart_type=mark_type,
+        title=title,
+        shelves=shelves,
+        reason=str(spec.get("reason") or "User-required chart"),
+        priority=1000,  # high, but the required=True flag is what protects it
+        top_n=top_n_dict,
+        sort_descending=sort_desc,
+        text_format=text_format,
+        required=True,
+    )
 
 
 def _is_rate_field(field_name: str) -> bool:

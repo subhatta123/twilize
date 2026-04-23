@@ -506,16 +506,45 @@ class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin,
         style: dict,
         apply_to: Optional[list[str]],
     ) -> None:
-        """Apply an already-extracted StyleReference dict onto workbook XML."""
+        """Apply an already-extracted StyleReference dict onto workbook XML.
+
+        In addition to the palette and dashboard/zone backgrounds applied by
+        the original implementation, this also:
+
+        * registers the image's categorical palette as a named
+          ``<color-palette>`` in ``<preferences>`` so the user can pick it
+          anywhere in Tableau Desktop,
+        * rotates ``mark-color`` across non-KPI worksheets using that
+          categorical palette (first chart → palette[0], second → palette[1],
+          …), giving a categorical feel without requiring a Color shelf,
+        * applies zone ``margin`` / ``border-width`` / ``border-style`` from
+          the image's detected card style + layout density,
+        * sets a font-family fallback across KPI worksheets so the text
+          treatment follows the reference's sans-serif / serif hint.
+        """
         colors = style.get("colors", {}) or {}
         typography = style.get("typography", {}) or {}
         borders = style.get("borders", {}) or {}
+        card_style = style.get("card_style", {}) or {}
+        layout_style = style.get("layout_style", {}) or {}
+        chart_palette: list[str] = list(style.get("chart_palette") or [])
 
         bg = colors.get("background")
         card_bg = colors.get("card_background") or bg
         text_primary = colors.get("text_primary")
-        border_color = borders.get("color") or colors.get("border")
+        # Borders: prefer the CSS-declared values, else the image's measured
+        # card-edge values, else the palette's mid-luminance role slot.
+        border_color = (
+            borders.get("color")
+            or card_style.get("border_color")
+            or colors.get("border")
+        )
         border_width = borders.get("width")
+        if border_width is None and card_style.get("border_width") is not None:
+            border_width = card_style["border_width"]
+        # Zone margin scales with detected whitespace: dense designs compress,
+        # spacious designs breathe.  None → leave template default.
+        zone_margin = layout_style.get("zone_margin")
 
         dashboards_el = self.root.find("dashboards")
         if dashboards_el is None:
@@ -556,17 +585,92 @@ class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin,
                     _set_format(zs, "border-color", border_color)
                 if border_width is not None:
                     _set_format(zs, "border-width", str(int(border_width)))
+                    # Mirror Tableau Desktop's "solid/none" enum — a >0 width
+                    # with border-style="none" renders as no border at all.
+                    bstyle = "solid" if int(border_width) > 0 else "none"
+                    _set_format(zs, "border-style", bstyle)
+
+                # Card spacing — only touch *card* zones (worksheets + filters
+                # + text), never layout-flow containers.  Setting margins on
+                # containers squeezes the whole chart area against the
+                # dashboard edges.
+                if zone_margin is not None and ztype != "layout-flow":
+                    # Filter zones need a minimum margin (6 px) so the
+                    # dropdown is visibly separated from the strip and
+                    # stays clickable even under a "dense" reference image
+                    # that otherwise collapses every card margin to ~2 px.
+                    if ztype == "filter":
+                        eff_margin = max(int(zone_margin), 6)
+                    else:
+                        eff_margin = int(zone_margin)
+                    _set_format(zs, "margin", str(eff_margin))
 
                 # Collect worksheet names referenced from this dashboard so we
                 # can restyle their pane text.
                 if zone.get("name") and not ztype:
                     touched_worksheets.add(zone.get("name"))
 
-        # Re-skin pane-level mark text (color + font-size) for worksheets
-        # that belong to the targeted dashboards.
-        title_size = typography.get("title_size")
-        body_size = typography.get("body_size")
-        font_family = typography.get("font_family")
+        # Pane-level mark-label typography is intentionally NOT re-skinned:
+        # Tableau's schema rejects <style-rule element="mark-labels"> and does
+        # not accept mark-labels-color / mark-labels-font-family /
+        # mark-labels-font-size as <format attr=...> on <style-rule element="mark">
+        # either. Valid mark-labels-* attrs are show/cull/mode/range-min/range-max;
+        # label typography lives in worksheet-level formatted-text blocks.
+        # (D2E8DA72 load errors confirmed this in prior attempts.)
+        _ = typography
+
+        # ── Worksheet-interior restyle ─────────────────────────────────
+        # Zone backgrounds only color the frame around each worksheet; the
+        # worksheet's own canvas / cell / header / mark colors are set by
+        # <style-rule element="worksheet"|"cell"|"header"|"mark"> inside
+        # <worksheet><table><style>. Re-skin those too so KPI cards actually
+        # look coloured (not just their zone frames) and so bar/line marks
+        # take the reference-image accent color instead of default blue.
+        accent = colors.get("accent") or colors.get("text_secondary")
+
+        # Rotate the categorical palette across non-KPI worksheets so that
+        # e.g. four bar charts in the same dashboard don't all look alike.
+        # Callers can inspect the assignment via the manifest's
+        # ``chart_mark_color_assignments`` key (set by the pipeline).
+        if chart_palette:
+            non_kpi_worksheets: list[str] = []
+            for ws_name in touched_worksheets:
+                try:
+                    ws = self._find_worksheet(ws_name)
+                except ValueError:
+                    continue
+                table = ws.find("table")
+                if table is None:
+                    continue
+                is_kpi_ws = any(
+                    (p.find("mark") is not None
+                     and p.find("mark").get("class") == "Text")
+                    for p in table.iter("pane")
+                )
+                if not is_kpi_ws:
+                    non_kpi_worksheets.append(ws_name)
+            non_kpi_worksheets.sort()  # stable ordering for reproducibility
+            chart_color_assignments = {
+                name: chart_palette[i % len(chart_palette)]
+                for i, name in enumerate(non_kpi_worksheets)
+            }
+        else:
+            chart_color_assignments = {}
+
+        # Register the categorical chart palette as a named custom palette
+        # in <preferences> so the user can also pick it from Tableau's color
+        # editor anywhere in the workbook.
+        if chart_palette and hasattr(self, "apply_color_palette"):
+            try:
+                self.apply_color_palette(
+                    colors=chart_palette,
+                    custom_name="reference-image",
+                )
+            except Exception as exc:  # noqa: BLE001 — best-effort registration
+                logger.warning(
+                    "Failed to register reference-image palette: %s", exc,
+                )
+
         for ws_name in touched_worksheets:
             try:
                 ws = self._find_worksheet(ws_name)
@@ -575,27 +679,84 @@ class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin,
             table = ws.find("table")
             if table is None:
                 continue
+
+            # Detect whether this worksheet is a KPI (Text mark) — the card
+            # background should cover the whole worksheet. For analytical
+            # charts, the card background would wash out the axes, so we
+            # only touch the mark color for those.
+            is_kpi_ws = False
             for pane in table.iter("pane"):
-                pane_style = pane.find("style")
-                if pane_style is None:
-                    pane_style = etree.SubElement(pane, "style")
+                mark = pane.find("mark")
+                if mark is not None and mark.get("class") == "Text":
+                    is_kpi_ws = True
+                    break
+
+            # 1) Worksheet canvas background (KPI cards only).
+            if is_kpi_ws and card_bg:
+                table_style = table.find("style")
+                if table_style is None:
+                    table_style = etree.SubElement(table, "style")
+                    # <style> belongs before <panes>.
+                    panes_el = table.find("panes")
+                    if panes_el is not None:
+                        table.remove(table_style)
+                        panes_el.addprevious(table_style)
+                _upsert_style_rule_format(
+                    table_style, "worksheet", "background-color", card_bg,
+                )
+                # Also set cell + header backgrounds to match — otherwise a
+                # thin white band can appear inside the card.
+                _upsert_style_rule_format(
+                    table_style, "cell", "background-color", card_bg,
+                )
+                _upsert_style_rule_format(
+                    table_style, "header", "background-color", card_bg,
+                )
+                # KPI text primary color from the palette, for readability.
                 if text_primary:
                     _upsert_style_rule_format(
-                        pane_style, "mark-labels", "color", text_primary
+                        table_style, "cell", "color", text_primary,
                     )
-                if body_size is not None:
-                    _upsert_style_rule_format(
-                        pane_style, "mark-labels", "font-size",
-                        f"{int(body_size)}pt",
-                    )
-                if font_family:
-                    _upsert_style_rule_format(
-                        pane_style, "mark-labels", "font-family", font_family
-                    )
-                if title_size is not None:
-                    _upsert_style_rule_format(
-                        pane_style, "title", "font-size", f"{int(title_size)}pt",
-                    )
+
+            # 2) Mark color inside every pane (bar/line/scatter charts).
+            #    Skip KPI worksheets — their "text" marks are calc-driven.
+            #    Use the rotated chart-palette assignment if available so
+            #    sibling charts in the same dashboard get distinct hues.
+            if not is_kpi_ws:
+                ws_mark_color = (
+                    chart_color_assignments.get(ws_name) or accent
+                )
+                if ws_mark_color:
+                    for pane in table.iter("pane"):
+                        pane_style = pane.find("style")
+                        if pane_style is None:
+                            pane_style = etree.SubElement(pane, "style")
+                        rule = None
+                        for sr in pane_style.findall("style-rule"):
+                            if sr.get("element") == "mark":
+                                rule = sr
+                                break
+                        if rule is None:
+                            rule = etree.SubElement(pane_style, "style-rule")
+                            rule.set("element", "mark")
+                        # Replace or add the mark-color format entry.
+                        existing = None
+                        for fmt in rule.findall("format"):
+                            if fmt.get("attr") == "mark-color":
+                                existing = fmt
+                                break
+                        if existing is not None:
+                            existing.set("value", ws_mark_color)
+                        else:
+                            etree.SubElement(
+                                rule, "format",
+                                {"attr": "mark-color", "value": ws_mark_color},
+                            )
+
+        # Expose the per-chart color assignments on the style dict so the
+        # pipeline can surface them in the manifest (callers read this via
+        # the return value of apply_style_reference).
+        style["chart_mark_color_assignments"] = chart_color_assignments
 
     def remove_calculated_field(self, field_name: str) -> str:
         """Remove a calculated field."""
@@ -812,19 +973,49 @@ class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin,
             if ws.get("name")
         ]
 
-    def list_dashboards(self) -> list[dict[str, list[str] | str]]:
-        """List dashboards with the worksheet zones they reference."""
+    def list_dashboards(self) -> list[dict]:
+        """List dashboards with the worksheets + filter zones they reference.
+
+        Each entry includes:
+          - ``name``        : dashboard name
+          - ``worksheets``  : chart worksheets placed on the dashboard
+          - ``filters``     : list of dicts
+                {"field": param, "scope": apply-to-worksheets,
+                 "mode": dropdown/single/multi, "height_px": int, "width_units": int}
+            so downstream consumers can verify filters are present,
+            clickable-sized, and scoped correctly.
+        """
 
         dashboards = self.root.find("dashboards")
         if dashboards is None:
             return []
 
-        dashboard_summaries: list[dict[str, list[str] | str]] = []
+        def _zone_px_height(zone) -> int:
+            """Best-effort pixel height of a zone based on the dashboard canvas."""
+            try:
+                return int(round(int(zone.get("h", "0")) / 100.0))
+            except (TypeError, ValueError):
+                return 0
+
+        dashboard_summaries: list[dict] = []
         for dashboard in dashboards.findall("dashboard"):
             worksheet_names: list[str] = []
+            filter_info: list[dict] = []
             zones = dashboard.find("zones")
             if zones is not None:
                 for zone in zones.findall(".//zone"):
+                    ztype = zone.get("type-v2")
+                    if ztype == "filter":
+                        filter_info.append({
+                            "field": zone.get("param") or "",
+                            "worksheet": zone.get("name") or "",
+                            "scope": zone.get("apply-to-worksheets") or "selected",
+                            "mode": zone.get("mode") or "",
+                            "height_units": int(zone.get("h", "0") or 0),
+                            "width_units": int(zone.get("w", "0") or 0),
+                            "height_px_est": _zone_px_height(zone),
+                        })
+                        continue
                     name = zone.get("name")
                     if name and name not in worksheet_names:
                         worksheet_names.append(name)
@@ -832,6 +1023,7 @@ class TWBEditor(ParametersMixin, ConnectionsMixin, ChartsMixin, DashboardsMixin,
                 {
                     "name": dashboard.get("name", ""),
                     "worksheets": worksheet_names,
+                    "filters": filter_info,
                 }
             )
         return dashboard_summaries

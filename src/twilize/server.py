@@ -18,6 +18,9 @@ from .mcp.tools_support import (
     describe_capability,
     diff_template_gap,
     list_capabilities,
+    repair_calc_fields,
+    validate_calc_fields,
+    validate_workbook,
 )
 from .mcp.tools_pipeline import (
     csv_to_dashboard,

@@ -137,11 +137,27 @@ def csv_to_dashboard(
     template_path: str = "",
     theme: str = "",
     rules_yaml: str = "",
-) -> str:
+    required_charts: list[dict] | None = None,
+    reference_image: str = "",
+) -> dict:
     """Build a complete Tableau dashboard from a CSV file (end-to-end).
 
     Pipeline: CSV → schema inference → chart suggestion → Hyper extract →
     workbook creation → chart configuration → dashboard layout → .twbx output.
+
+    IMPORTANT FOR AI AGENTS — know before you call:
+      * Auto-selected charts are picked by RULES (data shape + heuristics),
+        NOT by natural-language chart requests. To guarantee a specific chart
+        (e.g. "top 10 customers by profit") you MUST pass it via
+        ``required_charts``; otherwise it may or may not be generated and
+        may be trimmed out by ``max_charts``.
+      * The user's reference image is NOT automatically read from the chat.
+        If the user asks for styling "like this image", you must save the
+        image to disk and pass its path via ``reference_image``.
+      * This tool returns a STRUCTURED MANIFEST dict describing what was
+        actually built. Always cite fields from the returned manifest
+        (worksheets / theme / dashboards) when describing the result to
+        the user — do NOT invent charts that are not listed there.
 
     Args:
         csv_path: Path to the source CSV file.
@@ -153,9 +169,28 @@ def csv_to_dashboard(
             Options: modern-light, modern-dark, classic, minimal, vibrant.
         rules_yaml: Optional YAML string with dashboard rules overrides.
             Example: "kpi:\\n  font_size: 32\\n  max_kpis: 3"
+        required_charts: Optional list of chart specs that MUST be built.
+            Each entry is a dict, for example::
+
+                {"title": "Top 10 Customers by Profit",
+                 "kind": "bar",
+                 "rows": "Customer Name",
+                 "columns": "SUM(Profit)",
+                 "top_n": 10, "top_by": "SUM(Profit)",
+                 "sort_descending": "SUM(Profit)"}
+
+            Supported kinds: bar, line, scatter, pie, map, heatmap,
+            tree_map, text. Required charts bypass dedup + trim.
+        reference_image: Optional path to a PNG/JPG whose palette should
+            drive the dashboard styling. Applied AFTER the theme so image
+            colours win. The path must exist on disk; chat attachments
+            need to be saved first.
 
     Returns:
-        Summary of the created dashboard with file path.
+        Structured manifest dict with keys: ``status``, ``output_path``,
+        ``source``, ``dashboards``, ``worksheets``, ``charts_built``,
+        ``required_charts_fulfilled``, ``dropped_suggestions``, ``theme``,
+        ``warnings``, ``summary``. Cite THIS dict when describing results.
     """
     try:
         rules = _parse_rules_yaml(rules_yaml, csv_path)
@@ -167,9 +202,16 @@ def csv_to_dashboard(
             template_path=template_path,
             theme=theme,
             rules=rules,
+            required_charts=required_charts,
+            reference_image=reference_image,
+            return_manifest=True,
         )
     except Exception as exc:
-        return f"Error building dashboard from CSV: {exc}"
+        return {
+            "status": "error",
+            "error": str(exc),
+            "summary": f"Error building dashboard from CSV: {exc}",
+        }
 
 
 @server.tool()
@@ -210,11 +252,19 @@ def hyper_to_dashboard(
     table_name: str = "",
     theme: str = "",
     rules_yaml: str = "",
-) -> str:
+    required_charts: list[dict] | None = None,
+    reference_image: str = "",
+) -> dict:
     """Build a complete Tableau dashboard from a Hyper extract file (end-to-end).
 
     Pipeline: Hyper → schema inference → chart suggestion →
     workbook creation → chart configuration → dashboard layout → .twbx output.
+
+    IMPORTANT FOR AI AGENTS: auto-charts come from rules, not from
+    natural-language requests. Use ``required_charts`` to guarantee a
+    specific chart and ``reference_image`` for image-based styling. The
+    returned manifest dict is the SOURCE OF TRUTH — don't invent charts
+    that aren't in it.
 
     Args:
         hyper_path: Path to the .hyper file.
@@ -225,9 +275,11 @@ def hyper_to_dashboard(
         table_name: Table name inside the Hyper file (empty = first table).
         theme: Theme preset name (empty = use rules default).
         rules_yaml: Optional YAML string with dashboard rules overrides.
+        required_charts: See ``csv_to_dashboard.required_charts``.
+        reference_image: See ``csv_to_dashboard.reference_image``.
 
     Returns:
-        Summary of the created dashboard with file path.
+        Structured manifest dict describing what was actually built.
     """
     try:
         rules = _parse_rules_yaml(rules_yaml)
@@ -240,9 +292,16 @@ def hyper_to_dashboard(
             table_name=table_name,
             theme=theme,
             rules=rules,
+            required_charts=required_charts,
+            reference_image=reference_image,
+            return_manifest=True,
         )
     except Exception as exc:
-        return f"Error building dashboard from Hyper: {exc}"
+        return {
+            "status": "error",
+            "error": str(exc),
+            "summary": f"Error building dashboard from Hyper: {exc}",
+        }
 
 
 @server.tool()
@@ -259,13 +318,20 @@ def mysql_to_dashboard(
     template_path: str = "",
     theme: str = "",
     rules_yaml: str = "",
-) -> str:
+    required_charts: list[dict] | None = None,
+    reference_image: str = "",
+) -> dict:
     """Build a Tableau dashboard from a MySQL table (end-to-end).
 
     Pipeline: MySQL → schema inference → chart suggestion →
     workbook creation → live MySQL connection → .twb output.
 
     Requires mysql-connector-python for schema inference.
+
+    IMPORTANT FOR AI AGENTS: see ``csv_to_dashboard`` — auto-charts come
+    from rules, not natural-language requests. Use ``required_charts`` to
+    guarantee specific charts, ``reference_image`` for image-based
+    styling, and cite the returned manifest dict when describing results.
 
     Args:
         server_host: MySQL server hostname.
@@ -281,9 +347,11 @@ def mysql_to_dashboard(
         template_path: TWB template path.
         theme: Theme preset name.
         rules_yaml: Optional YAML string with dashboard rules overrides.
+        required_charts: See ``csv_to_dashboard.required_charts``.
+        reference_image: See ``csv_to_dashboard.reference_image``.
 
     Returns:
-        Summary of the created dashboard with file path.
+        Structured manifest dict describing what was actually built.
     """
     try:
         rules = _parse_rules_yaml(rules_yaml)
@@ -300,9 +368,16 @@ def mysql_to_dashboard(
             template_path=template_path,
             theme=theme,
             rules=rules,
+            required_charts=required_charts,
+            reference_image=reference_image,
+            return_manifest=True,
         )
     except Exception as exc:
-        return f"Error building dashboard from MySQL: {exc}"
+        return {
+            "status": "error",
+            "error": str(exc),
+            "summary": f"Error building dashboard from MySQL: {exc}",
+        }
 
 
 @server.tool()
@@ -320,13 +395,20 @@ def mssql_to_dashboard(
     template_path: str = "",
     theme: str = "",
     rules_yaml: str = "",
-) -> str:
+    required_charts: list[dict] | None = None,
+    reference_image: str = "",
+) -> dict:
     """Build a Tableau dashboard from a Microsoft SQL Server table (end-to-end).
 
     Pipeline: MSSQL → schema inference → chart suggestion →
     workbook creation → live MSSQL connection → .twb output.
 
     Requires pyodbc for schema inference and ODBC Driver 17 for SQL Server.
+
+    IMPORTANT FOR AI AGENTS: see ``csv_to_dashboard`` — auto-charts come
+    from rules, not natural-language requests. Use ``required_charts`` to
+    guarantee specific charts, ``reference_image`` for image-based
+    styling, and cite the returned manifest dict when describing results.
 
     Args:
         server_host: MSSQL server hostname.
@@ -342,9 +424,11 @@ def mssql_to_dashboard(
         template_path: TWB template path.
         theme: Theme preset name.
         rules_yaml: Optional YAML string with dashboard rules overrides.
+        required_charts: See ``csv_to_dashboard.required_charts``.
+        reference_image: See ``csv_to_dashboard.reference_image``.
 
     Returns:
-        Summary of the created dashboard with file path.
+        Structured manifest dict describing what was actually built.
     """
     try:
         rules = _parse_rules_yaml(rules_yaml)
@@ -362,6 +446,13 @@ def mssql_to_dashboard(
             template_path=template_path,
             theme=theme,
             rules=rules,
+            required_charts=required_charts,
+            reference_image=reference_image,
+            return_manifest=True,
         )
     except Exception as exc:
-        return f"Error building dashboard from MSSQL: {exc}"
+        return {
+            "status": "error",
+            "error": str(exc),
+            "summary": f"Error building dashboard from MSSQL: {exc}",
+        }

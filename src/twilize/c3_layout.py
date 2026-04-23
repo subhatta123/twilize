@@ -568,6 +568,166 @@ def _resolve_filter_param(
     return field_name
 
 
+def _compact_empty_layout_flow(template: etree._Element) -> None:
+    """Remove empty layout-flow zones and redistribute their size to siblings.
+
+    After unused ``SHEET_SLOT_N`` / ``KPI_SLOT_N`` placeholders are removed
+    from the template, their parent ``<zone type-v2="layout-flow">`` may be
+    left with no child ``<zone>`` elements.  Tableau still reserves that
+    zone's full height/width on the canvas, which shows up as empty space
+    in the rendered dashboard.
+
+    This helper walks bottom-up, removes every empty layout-flow zone, and
+    grows one sibling (the one facing the removed zone along the parent's
+    layout axis) by the vacated size so total canvas coverage is preserved.
+    Runs up to a few passes because removing one empty container can cause
+    its parent to also become empty.
+    """
+    for _ in range(4):  # a few passes are sufficient for any C2–C5 template
+        changed = False
+        empties: list[etree._Element] = []
+        for zone in template.iter("zone"):
+            if zone.get("type-v2") != "layout-flow":
+                continue
+            # child zones only (skip zone-style / layout-cache / format)
+            child_zones = [c for c in zone if c.tag == "zone"]
+            if not child_zones:
+                empties.append(zone)
+
+        for zone in empties:
+            parent = zone.getparent()
+            if parent is None:
+                continue
+            siblings = [c for c in parent if c.tag == "zone" and c is not zone]
+            try:
+                zone_h = int(zone.get("h") or 0)
+                zone_w = int(zone.get("w") or 0)
+                zone_y = int(zone.get("y") or 0)
+                zone_x = int(zone.get("x") or 0)
+            except (TypeError, ValueError):
+                zone_h = zone_w = zone_y = zone_x = 0
+            parent.remove(zone)
+            changed = True
+
+            if not siblings:
+                continue
+
+            # Redistribute along the parent's flow axis.
+            parent_is_vert = (parent.get("param") == "vert")
+            if parent_is_vert and zone_h:
+                # Grow the sibling(s) whose y is adjacent to the removed
+                # zone (prefer the one *above*; fall back to any sibling).
+                primary = None
+                for sib in siblings:
+                    try:
+                        sy = int(sib.get("y") or 0)
+                        sh = int(sib.get("h") or 0)
+                    except (TypeError, ValueError):
+                        continue
+                    if sy + sh == zone_y:
+                        primary = sib
+                        break
+                if primary is None:
+                    primary = siblings[-1]
+                try:
+                    cur_h = int(primary.get("h") or 0)
+                    primary.set("h", str(cur_h + zone_h))
+                except (TypeError, ValueError):
+                    pass
+                # Grow all nested sheet zones inside `primary` proportionally.
+                _grow_nested_zones(primary, extra_h=zone_h)
+            elif not parent_is_vert and zone_w:
+                primary = None
+                for sib in siblings:
+                    try:
+                        sx = int(sib.get("x") or 0)
+                        sw = int(sib.get("w") or 0)
+                    except (TypeError, ValueError):
+                        continue
+                    if sx + sw == zone_x:
+                        primary = sib
+                        break
+                if primary is None:
+                    primary = siblings[-1]
+                try:
+                    cur_w = int(primary.get("w") or 0)
+                    primary.set("w", str(cur_w + zone_w))
+                except (TypeError, ValueError):
+                    pass
+                _grow_nested_zones(primary, extra_w=zone_w)
+
+        if not changed:
+            break
+
+    # Second pass: any layout-flow container that now has exactly one child
+    # where that child doesn't already fill the container should be grown
+    # to fill.  This fixes the "half-empty row" case (e.g. only SHEET_SLOT_2
+    # was filled and SHEET_SLOT_3 was removed — the surviving 50%-wide
+    # child leaves the right half of the row blank).
+    for zone in template.iter("zone"):
+        if zone.get("type-v2") != "layout-flow":
+            continue
+        child_zones = [c for c in zone if c.tag == "zone"]
+        if len(child_zones) != 1:
+            continue
+        child = child_zones[0]
+        try:
+            parent_h = int(zone.get("h") or 0)
+            parent_w = int(zone.get("w") or 0)
+            parent_x = int(zone.get("x") or 0)
+            parent_y = int(zone.get("y") or 0)
+            child_h = int(child.get("h") or 0)
+            child_w = int(child.get("w") or 0)
+        except (TypeError, ValueError):
+            continue
+        is_vert = zone.get("param") == "vert"
+        if is_vert and child_h < parent_h:
+            extra = parent_h - child_h
+            child.set("h", str(parent_h))
+            _grow_nested_zones(child, extra_h=extra)
+        elif not is_vert and child_w < parent_w:
+            extra = parent_w - child_w
+            child.set("w", str(parent_w))
+            # Child may need repositioning so it starts at the parent's left.
+            child.set("x", str(parent_x))
+            child.set("y", str(parent_y))
+            _grow_nested_zones(child, extra_w=extra)
+
+
+def _grow_nested_zones(
+    container: etree._Element,
+    extra_h: int = 0,
+    extra_w: int = 0,
+) -> None:
+    """Propagate a height/width increase to every descendant zone.
+
+    When we grow a container to absorb an empty sibling, any descendant
+    ``<zone>`` whose own h / w spans the full extent of its parent needs
+    to grow by the same amount so its content fills the new space.
+    """
+    if extra_h == 0 and extra_w == 0:
+        return
+    try:
+        parent_h = int(container.get("h") or 0) - extra_h
+        parent_w = int(container.get("w") or 0) - extra_w
+    except (TypeError, ValueError):
+        return
+    for child in container:
+        if child.tag != "zone":
+            continue
+        try:
+            ch = int(child.get("h") or 0)
+            cw = int(child.get("w") or 0)
+        except (TypeError, ValueError):
+            continue
+        if extra_h and ch == parent_h:
+            child.set("h", str(ch + extra_h))
+            _grow_nested_zones(child, extra_h=extra_h)
+        if extra_w and cw == parent_w:
+            child.set("w", str(cw + extra_w))
+            _grow_nested_zones(child, extra_w=extra_w)
+
+
 def _swap_text_to_worksheet(zone: etree._Element, ws_name: str) -> None:
     """Convert a text placeholder zone into a worksheet zone.
 
@@ -647,17 +807,29 @@ def _swap_text_to_filter(
             parent.append(parent_zs)
         return
 
-    # Add filter zones
+    # Add filter zones.  Each filter is a clickable dropdown that must be
+    # wide enough to show its label + value and tall enough to hit with a
+    # mouse — Tableau collapses dropdowns below ~45 px.
     n = len(valid_filters)
-    fw = 98666 // n if n else 98666
+    # Leave a small gap between filters so dropdowns don't touch.
+    filter_gap = 200  # in 100000-unit width ≈ 2 px on a 1300-px canvas
+    total_w = 98666 - filter_gap * max(0, n - 1)
+    fw = total_w // n if n else 98666
     base_y = int(parent.get("y", "8750"))
+    filter_h = int(parent.get("h", "3750"))
 
-    # Determine filter apply mode from rules (default: "all" for truly global)
-    apply_mode = "all"
-    if rules:
-        apply_mode = (rules.get("layout", {})
-                      .get("filters", {})
-                      .get("apply_mode", "all"))
+    # Apply mode determines filter scope within the dashboard.
+    # Valid Tableau tokens:
+    #   "all"       – apply to every worksheet on THIS dashboard that
+    #                 uses the same datasource (the common "global" mode)
+    #   "selected"  – apply only to the source worksheet
+    # Default to "all" so the filter acts globally across the dashboard.
+    filter_rules = ((rules or {}).get("layout", {}) or {}).get("filters", {}) or {}
+    apply_mode = filter_rules.get("apply_mode", "all")
+    filter_bg = filter_rules.get("zone_background", "#ffffff")
+    filter_border = filter_rules.get("zone_border_color", "#d0d4d9")
+    filter_border_width = str(int(filter_rules.get("zone_border_width", 1)))
+    filter_margin = str(int(filter_rules.get("zone_margin", 6)))
 
     for fi, (field_name, resolved) in enumerate(valid_filters):
         fz = etree.SubElement(parent, "zone")
@@ -667,18 +839,21 @@ def _swap_text_to_filter(
         fz.set("mode", "dropdown")
         fz.set("show-title", "true")
         fz.set("apply-to-worksheets", apply_mode)
-        fz.set("x", str(667 + fi * fw))
+        fz.set("x", str(667 + fi * (fw + filter_gap)))
         fz.set("y", str(base_y))
         fz.set("w", str(fw))
-        fz.set("h", str(int(parent.get("h", "3750"))))
+        fz.set("h", str(filter_h))
         fz.set("param", resolved)
 
-        # Filter zone-style
+        # Filter zone-style: visible border + generous margin so the
+        # dropdown reads as a clickable card, not a line of text.
         zs = etree.SubElement(fz, "zone-style")
         for attr, val in [
-            ("border-color", "#000000"), ("border-style", "none"),
-            ("border-width", "0"), ("margin", "4"),
-            ("background-color", "#ffffff"),
+            ("border-color", filter_border),
+            ("border-style", "solid"),
+            ("border-width", filter_border_width),
+            ("margin", filter_margin),
+            ("background-color", filter_bg),
         ]:
             fmt = etree.SubElement(zs, "format")
             fmt.set("attr", attr)
@@ -687,6 +862,175 @@ def _swap_text_to_filter(
     # Re-add parent zone-style LAST
     if parent_zs is not None:
         parent.append(parent_zs)
+
+
+def _expand_filter_row(
+    template: etree._Element, rules: dict[str, Any] | None,
+) -> int:
+    """Ensure the filter bar is tall enough to be visible + clickable.
+
+    All four layout templates (C2/C3/C4/C5) historically ship a filter
+    container at ``fixed-size=30 / h=3750`` (~30 px on a 1300-px canvas).
+    That collapses Tableau's default dropdown styling below readability,
+    leaving the filter strip as a dark sliver users can't click.
+
+    This pass:
+
+    1. Grows the filter container to ``layout.filters.min_height_px``
+       (default 55 px / 5.5% of canvas height).
+    2. Shifts every zone sitting below the filter bar down by the same
+       amount so the KPI row doesn't collide.
+    3. Shrinks the chart container (the last fixed-size child of root)
+       by the same delta so the total dashboard height stays at 100 000
+       proportional units.  Nested chart slots are scaled proportionally.
+
+    Returns the ``delta_h`` (in proportional units) that was applied; 0
+    if no change.  Called from ``_build_from_template_xml`` right after
+    the template is parsed.
+    """
+    filter_cfg = ((rules or {}).get("layout", {}) or {}).get("filters", {}) or {}
+    min_px = int(filter_cfg.get("min_height_px", 55))
+
+    # Locate the filter container (id="3" in every template; secondary
+    # fallback is a <zone> that contains a FILTERS PLACEHOLDER descendant).
+    filter_zone = None
+    for z in template.iter("zone"):
+        if z.get("id") == "3":
+            filter_zone = z
+            break
+    if filter_zone is None:
+        for z in template.iter("zone"):
+            for ft in z.iter("formatted-text"):
+                run = ft.find("run")
+                if run is not None and (run.text or "").strip() == "FILTERS PLACEHOLDER":
+                    filter_zone = z
+                    break
+            if filter_zone is not None:
+                break
+    if filter_zone is None:
+        return 0
+
+    try:
+        cur_fs = int(filter_zone.get("fixed-size", "30"))
+        cur_h = int(filter_zone.get("h", "3750"))
+        filter_y = int(filter_zone.get("y", "0"))
+    except (TypeError, ValueError):
+        return 0
+    if cur_fs <= 0 or cur_fs >= min_px:
+        return 0  # already adequate — don't waste chart space
+
+    delta_fs = min_px - cur_fs
+    # Preserve ratio between fixed-size (px) and h (100000-proportional).
+    new_h = int(cur_h * min_px / cur_fs)
+    delta_h = new_h - cur_h
+    filter_bottom = filter_y + cur_h
+
+    # 1) Grow the filter container itself.
+    filter_zone.set("fixed-size", str(min_px))
+    filter_zone.set("h", str(new_h))
+    for ch in filter_zone.iter("zone"):
+        if ch is filter_zone:
+            continue
+        try:
+            ch_h = int(ch.get("h", str(cur_h)))
+        except (TypeError, ValueError):
+            continue
+        if ch_h == cur_h:
+            ch.set("h", str(new_h))
+
+    # 2) Shift every OTHER zone whose y sits at or below the filter
+    #    bottom.  Children of filter_zone are already handled above.
+    filter_descendants = set(id(z) for z in filter_zone.iter("zone"))
+    for z in template.iter("zone"):
+        if id(z) in filter_descendants:
+            continue
+        try:
+            z_y = int(z.get("y", "0"))
+        except (TypeError, ValueError):
+            continue
+        if z_y >= filter_bottom:
+            z.set("y", str(z_y + delta_h))
+
+    # 3) Reclaim the delta from the zones below the filter so the
+    #    dashboard still fits the 100 000-unit root.
+    #
+    #    Case A — c3 template: the last root child is an `is-fixed`
+    #             chart container with h ~= 75 000.  Shrink it + all
+    #             descendants proportionally.
+    #    Case B — c2/c4 templates: the chart rows are non-fixed
+    #             direct children of root, each h ~= 37 500.  Shrink
+    #             each one by half the delta (or proportionally to
+    #             their share) so the total collapses by delta_h.
+    root_zone = template.find("zone")
+    if root_zone is not None:
+        fixed_chart_container = None
+        nonfixed_chart_rows: list[etree._Element] = []
+        for child in root_zone.findall("zone"):
+            try:
+                child_h = int(child.get("h", "0"))
+                child_y = int(child.get("y", "0"))
+            except (TypeError, ValueError):
+                continue
+            # Only rows BELOW the (original) filter qualify.
+            if child_y < filter_bottom:
+                continue
+            if child.get("is-fixed") == "true" and child_h >= 30000:
+                fixed_chart_container = child  # last one wins
+            elif child.get("is-fixed") != "true":
+                nonfixed_chart_rows.append(child)
+
+        if fixed_chart_container is not None:
+            try:
+                cc_fs = int(fixed_chart_container.get("fixed-size", "0"))
+                cc_h = int(fixed_chart_container.get("h", "0"))
+            except (TypeError, ValueError):
+                cc_fs = cc_h = 0
+            if cc_h > delta_h:
+                new_cc_h = cc_h - delta_h
+                fixed_chart_container.set("h", str(new_cc_h))
+                if cc_fs > delta_fs:
+                    fixed_chart_container.set("fixed-size", str(cc_fs - delta_fs))
+                scale = new_cc_h / cc_h
+                for ch in fixed_chart_container.iter("zone"):
+                    if ch is fixed_chart_container:
+                        continue
+                    try:
+                        ch_h = int(ch.get("h", "0"))
+                    except (TypeError, ValueError):
+                        continue
+                    ch.set("h", str(int(ch_h * scale)))
+        elif nonfixed_chart_rows:
+            # Shrink each non-fixed row proportionally.  Remaining
+            # slots below the filter must together lose delta_h units.
+            total = sum(int(r.get("h", "0")) for r in nonfixed_chart_rows) or 1
+            cumulative_shift = 0
+            for r in nonfixed_chart_rows:
+                try:
+                    r_h = int(r.get("h", "0"))
+                except (TypeError, ValueError):
+                    continue
+                row_delta = int(delta_h * r_h / total)
+                new_r_h = max(0, r_h - row_delta)
+                scale = new_r_h / r_h if r_h else 1
+                r.set("h", str(new_r_h))
+                # Push this row's y up by anything previous rows lost
+                # so they stack cleanly.
+                try:
+                    r.set("y", str(int(r.get("y", "0")) - cumulative_shift))
+                except (TypeError, ValueError):
+                    pass
+                cumulative_shift += row_delta
+                # Scale descendants' h to match.
+                for ch in r.iter("zone"):
+                    if ch is r:
+                        continue
+                    try:
+                        ch_h = int(ch.get("h", "0"))
+                    except (TypeError, ValueError):
+                        continue
+                    ch.set("h", str(int(ch_h * scale)))
+
+    return delta_h
 
 
 def _apply_rules_to_template(template: etree._Element, rules: dict[str, Any]) -> None:
@@ -820,6 +1164,12 @@ def build_c3_zones(
     if rules:
         _apply_rules_to_template(template, rules)
 
+    # Grow the filter bar so filters are visibly clickable (default 55 px).
+    # Every template ships with a 30-px filter strip that collapses the
+    # dropdown below Tableau's minimum readable size; this pass re-flows
+    # the zones below it to recover the height without overflowing.
+    _expand_filter_row(template, rules)
+
     # Build slot→name mappings
     kpi_map: dict[str, str] = {}
     for i, name in enumerate(kpi_names):
@@ -890,6 +1240,14 @@ def build_c3_zones(
         parent = z.getparent()
         if parent is not None:
             parent.remove(z)
+
+    # Compact empty layout-flow containers left behind by the removals above.
+    # When e.g. only SHEET_SLOT_1 is filled, the second horizontal row (that
+    # would have hosted SHEET_SLOT_2 + SHEET_SLOT_3) is now an empty
+    # layout-flow zone taking 37.5% of the canvas height — shown in the UI
+    # as dead space under the one chart.  Redistribute that height back to
+    # the remaining sibling(s) so the dashboard uses the whole canvas.
+    _compact_empty_layout_flow(template)
 
     # If no KPIs at all, remove the KPI container row
     if not kpi_names:

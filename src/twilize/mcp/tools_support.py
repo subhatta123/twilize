@@ -32,6 +32,17 @@ TOOL INVENTORY
       Validate a saved .twb/.twbx file — or the current in-memory editor —
       against the official Tableau XSD schema (2026.1).  Failures are
       informational: Tableau Desktop is the true validator.
+
+  validate_calc_fields()
+      Scan the currently open workbook for calculated fields whose
+      declared role/datatype disagree (most commonly a string-typed
+      calc carrying role="measure", which Tableau cannot aggregate and
+      shows with a red ``!`` in the Data pane).
+
+  repair_calc_fields()
+      Same scan plus in-place fix: demote the offending string-typed
+      measures to dimensions. Returns the list of fields that were
+      repaired.
 """
 
 from __future__ import annotations
@@ -119,3 +130,38 @@ def validate_workbook(file_path: Optional[str] = None) -> str:
         result = validate_against_schema(editor.root)
 
     return result.to_text()
+
+
+@server.tool()
+def validate_calc_fields() -> str:
+    """Scan open workbook for role/datatype mismatches on calculated fields.
+
+    Catches the common failure mode where a string-typed calculation ships
+    with ``role="measure"``. Tableau cannot aggregate a string, so the field
+    shows a red ``!`` in the Data pane and any SUM/AVG/ATTR reference to it
+    is rejected with "can't be converted to a measure using ATTR()".
+
+    This is a read-only check. To fix detected issues in place call
+    :func:`repair_calc_fields`.
+    """
+    from ..calc_field_validator import find_mismatches, format_report
+
+    editor = get_editor()
+    issues = find_mismatches(editor.root)
+    return format_report(issues, repaired=False)
+
+
+@server.tool()
+def repair_calc_fields() -> str:
+    """Fix role/datatype mismatches on calculated fields in the open workbook.
+
+    Demotes string-typed calculations that carry ``role="measure"`` to
+    ``role="dimension"`` (with ``type="nominal"``). Use this after
+    :func:`open_workbook` when the sidebar shows red ``!`` markers on KPI
+    label calcs. Call :func:`save_workbook` afterwards to persist the fix.
+    """
+    from ..calc_field_validator import repair_mismatches, format_report
+
+    editor = get_editor()
+    issues = repair_mismatches(editor.root, apply=True)
+    return format_report(issues, repaired=True)
